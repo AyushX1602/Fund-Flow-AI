@@ -1,0 +1,47 @@
+# ── Node.js ──
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# ── Environment ──
+.env
+.env.local
+.env.*.local
+
+# ── Build output ──
+client/dist/
+server/dist/
+
+# ── Prisma generated (rebuild on install) ──
+server/generated/prisma/query_engine-*
+server/generated/prisma/libquery_engine-*
+
+# ── Python ──
+Fraud_Detection/Fraud_Detection/venv/
+Fraud_Detection/Fraud_Detection/__pycache__/
+Fraud_Detection/Fraud_Detection/**/__pycache__/
+*.pyc
+*.pyo
+
+# ── Large data files (exceed GitHub 100MB limit) ──
+Fraud_Detection/Fraud_Detection/fundflow.db
+Fraud_Detection/Fraud_Detection/data/processed/india_extras.pkl
+
+# ── Raw dataset (user must download from Kaggle) ──
+Fraud_Detection/Fraud_Detection/paysim dataset.csv
+Fraud_Detection/Fraud_Detection/data/raw/
+
+# ── OS / IDE ──
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# ── Logs ──
+*.log
+logs/
+
+# ── Misc ──
+.cache/
+*.tmp

@@ -1,0 +1,418 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>FundFlow AI — Real-Time Fraud Intelligence Platform</title>
+  <meta name="description" content="FundFlow AI: Real-time fraud detection, fund flow tracking, and investigation platform for PSBs Hackathon 2026." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <script src="/js/vis-network.min.js"></script>
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+
+<!-- ── SIDEBAR ─────────────────────────────────────────────────────────────── -->
+<aside class="sidebar" id="sidebar">
+  <div class="sidebar-logo">
+    <div class="logo-icon">⚡</div>
+    <div class="logo-text">
+      <span class="logo-main">FundFlow AI</span>
+      <span class="logo-sub">Fraud Intelligence</span>
+    </div>
+  </div>
+
+  <nav class="sidebar-nav">
+    <a href="#" class="nav-item active" data-page="dashboard" id="nav-dashboard">
+      <span class="nav-icon">🏠</span><span>Command Center</span>
+    </a>
+    <a href="#" class="nav-item" data-page="fundflow" id="nav-fundflow">
+      <span class="nav-icon">🔀</span><span>Fund Flow Explorer</span>
+    </a>
+    <a href="#" class="nav-item" data-page="alerts" id="nav-alerts">
+      <span class="nav-icon">🔔</span><span>Alerts</span>
+      <span class="badge" id="alert-badge">0</span>
+    </a>
+    <a href="#" class="nav-item" data-page="investigation" id="nav-investigation">
+      <span class="nav-icon">🔍</span><span>Investigation</span>
+    </a>
+    <a href="#" class="nav-item" data-page="mules" id="nav-mules">
+      <span class="nav-icon">🐴</span><span>Mule Network</span>
+    </a>
+    <a href="#" class="nav-item" data-page="model" id="nav-model">
+      <span class="nav-icon">📊</span><span>Model Performance</span>
+    </a>
+  </nav>
+
+  <div class="sidebar-status">
+    <div class="status-dot" id="status-dot"></div>
+    <span id="status-text">Connecting...</span>
+  </div>
+</aside>
+
+<!-- ── MAIN CONTENT ────────────────────────────────────────────────────────── -->
+<main class="main-content">
+
+  <!-- ══ PAGE 1: COMMAND CENTER ══════════════════════════════════════════════ -->
+  <section class="page active" id="page-dashboard">
+    <header class="page-header">
+      <div>
+        <h1>Command Center</h1>
+        <p class="page-subtitle">Real-time fraud intelligence dashboard</p>
+      </div>
+      <div class="header-actions">
+        <span class="live-badge">● LIVE</span>
+        <span id="last-updated" class="text-muted">Updating...</span>
+      </div>
+    </header>
+
+    <!-- Simulator Control Bar -->
+    <div class="sim-bar" id="sim-bar">
+      <div style="display:flex;align-items:center;gap:.5rem">
+        <span id="sim-status-dot" style="width:10px;height:10px;border-radius:50%;background:#444;display:inline-block;transition:background .3s"></span>
+        <span id="sim-status-txt" style="font-size:.8rem;font-weight:600;color:var(--text-muted)">Simulator Off</span>
+      </div>
+      <select id="sim-rate" class="select-field" style="width:115px;padding:.35rem .6rem;font-size:.8rem">
+        <option value="1">1 tx / sec</option>
+        <option value="2" selected>2 tx / sec</option>
+        <option value="5">5 tx / sec</option>
+        <option value="10">10 tx / sec</option>
+      </select>
+      <button class="btn btn-primary" id="btn-sim-toggle" onclick="toggleSimulator()" style="padding:.4rem 1.1rem;font-size:.8rem">▶ Start Replay</button>
+      <div style="display:flex;gap:1.5rem;font-size:.8rem;margin-left:.5rem">
+        <span>Scored: <strong id="sim-count" style="color:#4a9eff">0</strong></span>
+        <span>Fraud flagged: <strong id="sim-fraud" style="color:#ff3d5a">0</strong></span>
+        <span id="sim-latency" style="color:var(--text-muted)"></span>
+      </div>
+    </div>
+
+    <!-- KPI Cards -->
+    <div class="kpi-grid">
+      <div class="kpi-card">
+        <div class="kpi-icon blue">💳</div>
+        <div class="kpi-body">
+          <div class="kpi-value" id="kpi-total">—</div>
+          <div class="kpi-label">Total Transactions</div>
+        </div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-icon red">🚨</div>
+        <div class="kpi-body">
+          <div class="kpi-value" id="kpi-fraud">—</div>
+          <div class="kpi-label">Fraud Detected</div>
+        </div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-icon yellow">🔔</div>
+        <div class="kpi-body">
+          <div class="kpi-value" id="kpi-alerts">—</div>
+          <div class="kpi-label">Active Alerts</div>
+        </div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-icon purple">🔀</div>
+        <div class="kpi-body">
+          <div class="kpi-value" id="kpi-rings">—</div>
+          <div class="kpi-label">Fraud Rings</div>
+        </div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-icon orange">🐴</div>
+        <div class="kpi-body">
+          <div class="kpi-value" id="kpi-mules">—</div>
+          <div class="kpi-label">Mule Accounts</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Charts Row -->
+    <div class="charts-row">
+      <div class="card chart-card">
+        <div class="card-header">
+          <h2>Risk Distribution</h2>
+        </div>
+        <div class="chart-container-sm">
+          <canvas id="chart-risk-dist"></canvas>
+        </div>
+      </div>
+      <div class="card chart-card">
+        <div class="card-header">
+          <h2>Fraud by Transaction Type</h2>
+        </div>
+        <div class="chart-container-sm">
+          <canvas id="chart-fraud-type"></canvas>
+        </div>
+      </div>
+    </div>
+
+    <!-- Live Feed + Top Alerts -->
+    <div class="feed-row">
+      <div class="card feed-card">
+        <div class="card-header">
+          <h2>⚡ Live Transaction Feed</h2>
+          <button class="btn-sm" id="btn-toggle-feed">Pause</button>
+        </div>
+        <div class="live-feed" id="live-feed">
+          <div class="feed-placeholder">Connecting to live feed...</div>
+        </div>
+      </div>
+      <div class="card alerts-mini-card">
+        <div class="card-header">
+          <h2>🔴 Recent Critical Alerts</h2>
+          <a href="#" class="btn-sm" data-page="alerts">View All</a>
+        </div>
+        <div id="recent-alerts-list" class="alerts-mini-list"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ══ PAGE 2: FUND FLOW EXPLORER ══════════════════════════════════════════ -->
+  <section class="page" id="page-fundflow">
+    <header class="page-header">
+      <div>
+        <h1>Fund Flow Explorer</h1>
+        <p class="page-subtitle">Trace multi-hop fund movements with temporal animation</p>
+      </div>
+    </header>
+
+    <div class="fundflow-layout">
+      <div class="card fundflow-controls">
+        <h2>Trace Funds</h2>
+        <div class="form-group">
+          <label>Account ID</label>
+          <input type="text" id="ff-account" placeholder="e.g. C1231006815" class="input-field" />
+        </div>
+        <div class="form-group">
+          <label>Max Hops</label>
+          <input type="number" id="ff-hops" value="6" min="1" max="10" class="input-field" />
+        </div>
+        <div class="form-group">
+          <label>Time Window (hours)</label>
+          <input type="number" id="ff-window" value="24" min="1" max="168" class="input-field" />
+        </div>
+        <button class="btn-primary" id="btn-trace">🔍 Trace Flow</button>
+        <button class="btn-secondary" id="btn-animate">▶ Animate</button>
+        <button class="btn-secondary" id="btn-clear-ff">✕ Clear</button>
+
+        <div class="flow-summary" id="flow-summary" style="display:none">
+          <div class="summary-row"><span>Total Hops</span><span id="ff-hops-val">—</span></div>
+          <div class="summary-row"><span>Accounts</span><span id="ff-nodes-val">—</span></div>
+          <div class="summary-row"><span>Total Amount</span><span id="ff-amount-val">—</span></div>
+          <div class="summary-row"><span>Time Span</span><span id="ff-time-val">—</span></div>
+          <div class="summary-row"><span>Fraud Edges</span><span id="ff-fraud-val" class="text-red">—</span></div>
+        </div>
+      </div>
+
+      <div class="card fundflow-graph-card">
+        <div class="card-header">
+          <h2>Fund Flow Graph</h2>
+          <div class="legend">
+            <span class="legend-dot red"></span><span>High Risk</span>
+            <span class="legend-dot yellow"></span><span>Medium</span>
+            <span class="legend-dot green"></span><span>Low Risk</span>
+          </div>
+        </div>
+        <div id="fundflow-graph" class="graph-container"></div>
+        <div class="animation-controls" id="anim-controls" style="display:none">
+          <span class="anim-label">Hop:</span>
+          <input type="range" id="anim-scrubber" min="0" max="6" value="0" class="scrubber" />
+          <span id="anim-hop-label">0 / 0</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Fraud Rings Table -->
+    <div class="card" style="margin-top:1.5rem">
+      <div class="card-header">
+        <h2>🔄 Detected Fraud Rings</h2>
+        <span id="rings-count" class="badge red">0</span>
+      </div>
+      <div class="table-wrapper">
+        <table class="data-table" id="rings-table">
+          <thead>
+            <tr>
+              <th>Ring ID</th><th>Accounts</th><th>Size</th>
+              <th>Total Amount</th><th>Time Span</th><th>Risk Score</th><th>Action</th>
+            </tr>
+          </thead>
+          <tbody id="rings-tbody"></tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <!-- ══ PAGE 3: ALERTS ══════════════════════════════════════════════════════ -->
+  <section class="page" id="page-alerts">
+    <header class="page-header">
+      <div>
+        <h1>Alert Management</h1>
+        <p class="page-subtitle">Review and action fraud alerts</p>
+      </div>
+      <div class="header-actions">
+        <select id="alerts-filter" class="select-field">
+          <option value="">All Alerts</option>
+          <option value="NEW">New</option>
+          <option value="INVESTIGATING">Investigating</option>
+          <option value="CLOSED">Closed</option>
+        </select>
+      </div>
+    </header>
+    <div class="alerts-grid" id="alerts-grid"></div>
+  </section>
+
+  <!-- ══ PAGE 4: INVESTIGATION ═══════════════════════════════════════════════ -->
+  <section class="page" id="page-investigation">
+    <header class="page-header">
+      <div>
+        <h1>Investigation Workspace</h1>
+        <p class="page-subtitle">Manage fraud cases and investigate account risk profiles</p>
+      </div>
+      <div class="header-actions">
+        <input id="acct-lookup-input" class="input-field" placeholder="Account ID or VPA lookup..." style="width:260px" />
+        <button class="btn btn-primary" onclick="lookupAccount()">🔍 Profile</button>
+      </div>
+    </header>
+
+    <!-- Account Profile Panel (hidden until lookup) -->
+    <div class="card" id="account-profile-card" style="display:none;margin-bottom:1.5rem">
+      <div class="card-header">
+        <h2>🧑 Account Risk Profile</h2>
+        <div style="display:flex;gap:.75rem;align-items:center">
+          <button class="btn btn-secondary" id="btn-aa-pull" onclick="showAAModal()">🏦 Request AA Data Pull</button>
+          <button class="btn btn-danger" id="btn-freeze-acct" onclick="freezeFromProfile()">🧊 Freeze Account</button>
+        </div>
+      </div>
+      <div id="account-profile-body" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:1.25rem;padding:1.25rem"></div>
+    </div>
+
+    <!-- Manual Transaction Scorer -->
+    <div class="card" style="margin-bottom: 1.5rem">
+      <div class="card-header">
+        <h2>⚡ Live Transaction Scorer</h2>
+      </div>
+      <div style="padding: 1.25rem;">
+        <form id="form-manual-score" style="display:flex; flex-wrap:wrap; gap:1rem; align-items:flex-end;">
+          <div style="flex:1; min-width:200px;"><label class="input-label" style="display:block;margin-bottom:4px;font-size:.8rem;color:var(--text-muted)">Sender Account</label><input type="text" id="man-sender" class="input-field" placeholder="e.g. C1953680528" required style="width:100%"></div>
+          <div style="flex:1; min-width:200px;"><label class="input-label" style="display:block;margin-bottom:4px;font-size:.8rem;color:var(--text-muted)">Receiver Account</label><input type="text" id="man-receiver" class="input-field" placeholder="e.g. M123456" required style="width:100%"></div>
+          <div style="flex:1; min-width:150px;"><label class="input-label" style="display:block;margin-bottom:4px;font-size:.8rem;color:var(--text-muted)">Amount (₹)</label><input type="number" id="man-amount" class="input-field" placeholder="25000" required style="width:100%"></div>
+          <div style="flex:1; min-width:150px;"><label class="input-label" style="display:block;margin-bottom:4px;font-size:.8rem;color:var(--text-muted)">Txn Type</label>
+            <select id="man-type" class="select-field" style="width:100%">
+              <option value="UPI">UPI</option>
+              <option value="NEFT">NEFT</option>
+              <option value="IMPS">IMPS</option>
+              <option value="RTGS">RTGS</option>
+              <option value="TRANSFER">TRANSFER</option>
+            </select>
+          </div>
+          <div><button type="button" class="btn btn-primary" onclick="scoreManualTxn()" style="height:36px;padding:0 1.5rem">Score Now</button></div>
+        </form>
+        <div id="man-score-result" style="margin-top: 1rem; display: none; padding: 1rem; border-radius: 6px; background: rgba(0,0,0,0.2); border: 1px solid var(--border);"></div>
+      </div>
+    </div>
+
+    <div class="investigation-layout">
+      <div class="card cases-list-card">
+        <div class="card-header"><h2>Cases</h2></div>
+        <div id="cases-list" class="cases-list"></div>
+      </div>
+      <div class="card case-detail-card" id="case-detail">
+        <div class="case-placeholder">
+          <span>🔍</span>
+          <p>Select a case to view details</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ══ PAGE 5: MULE NETWORK ════════════════════════════════════════════════ -->
+  <section class="page" id="page-mules">
+    <header class="page-header">
+      <div>
+        <h1>Mule Account Network</h1>
+        <p class="page-subtitle">Suspected money mule accounts and their connections</p>
+      </div>
+    </header>
+    <div class="mule-layout">
+      <div class="card" style="flex:1;min-height:500px">
+        <div class="card-header"><h2>Mule Network Graph</h2></div>
+        <div id="mule-graph" class="graph-container"></div>
+      </div>
+      <div class="card mule-table-card">
+        <div class="card-header"><h2>Top Suspected Mules</h2></div>
+        <div class="table-wrapper">
+          <table class="data-table">
+            <thead>
+              <tr><th>Account</th><th>Mule Score</th><th>Pass-Through</th><th>Senders</th><th>KYC Status</th><th>Action</th></tr>
+            </thead>
+            <tbody id="mule-tbody"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ══ PAGE 6: MODEL PERFORMANCE ══════════════════════════════════════════ -->
+  <section class="page" id="page-model">
+    <header class="page-header">
+      <div>
+        <h1>Model Performance</h1>
+        <p class="page-subtitle">XGBoost fraud detection model metrics</p>
+      </div>
+    </header>
+    <div id="model-content">
+      <div class="loading-spinner">Loading model metrics...</div>
+    </div>
+  </section>
+
+</main>
+
+<!-- ── FREEZE MODAL ──────────────────────────────────────────────────────────── -->
+<div class="modal-overlay" id="freeze-modal" style="display:none">
+  <div class="modal">
+    <div class="modal-header">
+      <h2>🧊 Freeze Simulation</h2>
+      <button class="modal-close" id="freeze-modal-close">✕</button>
+    </div>
+    <div class="modal-body" id="freeze-modal-body">
+      <div class="loading-spinner">Simulating...</div>
+    </div>
+  </div>
+</div>
+
+<!-- ── ACCOUNT AGGREGATOR MODAL ────────────────────────────────────────────── -->
+<div class="modal-overlay" id="aa-modal" style="display:none">
+  <div class="modal" style="max-width:540px">
+    <div class="modal-header">
+      <h2>🏦 Account Aggregator Data Pull</h2>
+      <button class="modal-close" onclick="document.getElementById('aa-modal').style.display='none'">✕</button>
+    </div>
+    <div class="modal-body" id="aa-modal-body">
+      <div style="margin-bottom:1rem;padding:.75rem;background:rgba(99,102,241,.12);border-radius:.5rem;border:1px solid rgba(99,102,241,.3)">
+        <strong style="color:#818cf8">RBI Account Aggregator Framework (NBFC-AA)</strong><br/>
+        <small style="color:var(--text-muted)">Live network: Finvu · OneMoney · CAMS FinServ · Perfios AA. Customer consent required before data pull.</small>
+      </div>
+      <div id="aa-data-body"><div class="loading-spinner">Requesting consent-based data pull…</div></div>
+    </div>
+  </div>
+</div>
+
+<!-- ⚡ SHAP EXPLAIN MODAL ⚡ -->
+<div class="modal-overlay" id="shap-modal" style="display:none">
+  <div class="modal" style="max-width:600px">
+    <div class="modal-header">
+      <h2>🧠 AI Fraud Explanation (SHAP)</h2>
+      <button class="modal-close" onclick="document.getElementById('shap-modal').style.display='none'">✕</button>
+    </div>
+    <div class="modal-body" id="shap-modal-body">
+      <div class="loading-spinner">Loading AI explanation...</div>
+    </div>
+  </div>
+</div>
+
+<script src="js/app.js?v=5"></script>
+<script src="js/charts.js?v=4"></script>
+<script src="js/graph.js?v=4"></script>
+<script src="js/websocket.js?v=4"></script>
+</body>
+</html>

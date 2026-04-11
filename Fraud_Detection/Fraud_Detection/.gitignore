@@ -1,0 +1,32 @@
+# Environments
+.env
+.venv
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Models and Large Pkls (Uncomment if using Git LFS, or keep ignored to save bandwidth)
+data/processed/india_extras.pkl
+data/processed/graph_features.pkl
+models/saved/*.pkl
+
+# Massive Databases and Datasets
+fundflow.db    
+data/processed/transactions_processed.csv
+
+# Logs and databases
+*.log
+*.sqlite
+*.sqlite3
+
+# IDEs
+.vscode/
+.idea/
+.spyderproject
