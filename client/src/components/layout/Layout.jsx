@@ -5,9 +5,10 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 export default function Layout() {
   return (
     <TooltipProvider>
-      <div className="flex min-h-screen">
+      <div className="flex min-h-screen bg-background">
         <Sidebar />
-        <main className="ml-60 flex-1 flex flex-col min-w-0">
+        {/* pl-16 = 64px to always clear the collapsed sidebar */}
+        <main className="flex-1 flex flex-col min-w-0 pl-16">
           <Outlet />
         </main>
       </div>
