@@ -44,11 +44,24 @@ function TransactionDetail({ txn, onClose }) {
 
   useEffect(() => {
     if (txn?.id) {
-      api.post(`/ml/explain/${txn.id}`, {}).then((res) => setExplanation(res.data)).catch(() => {});
+      api.post(`/ml/explain/${txn.id}`, {})
+        .then((res) => {
+          // API returns { explanation: { reasons: [...] } } or { explanation: { transactionId, reasons } }
+          const exp = res.data?.explanation || res.data;
+          setExplanation(exp);
+        })
+        .catch(() => {});
     }
   }, [txn?.id]);
 
   if (!txn) return null;
+
+  // Collect reasons from any available source
+  const reasons = explanation?.reasons
+    || explanation?.explanation?.reasons
+    || txn.mlReasons
+    || txn.fraudReasons
+    || null;
 
   return (
     <Dialog open={!!txn} onOpenChange={onClose}>
@@ -94,10 +107,8 @@ function TransactionDetail({ txn, onClose }) {
 
           <div>
             <h4 className="text-sm font-medium mb-2">ML Explanation</h4>
-            {explanation?.reasons ? (
-              <ShapBars reasons={explanation.reasons} />
-            ) : txn.fraudReasons ? (
-              <ShapBars reasons={txn.fraudReasons} />
+            {reasons && reasons.length > 0 ? (
+              <ShapBars reasons={reasons} />
             ) : (
               <p className="text-xs text-muted-foreground">No explanation available</p>
             )}

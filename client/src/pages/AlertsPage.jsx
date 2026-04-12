@@ -28,11 +28,22 @@ function AlertDetail({ alert, onClose }) {
 
   useEffect(() => {
     if (alert?.transactionId) {
-      api.post(`/ml/explain/${alert.transactionId}`, {}).then((r) => setExplanation(r.data)).catch(() => {});
+      api.post(`/ml/explain/${alert.transactionId}`, {})
+        .then((r) => {
+          const exp = r.data?.explanation || r.data;
+          setExplanation(exp);
+        })
+        .catch(() => {});
     }
   }, [alert?.transactionId]);
 
   if (!alert) return null;
+
+  // Fraud score lives on the transaction, not the alert
+  const score = alert.fraudScore ?? alert.transaction?.fraudScore ?? null;
+  const reasons = explanation?.reasons
+    || explanation?.explanation?.reasons
+    || null;
 
   return (
     <Dialog open={!!alert} onOpenChange={onClose}>
@@ -55,8 +66,8 @@ function AlertDetail({ alert, onClose }) {
               </div>
               <div>
                 <p className="text-xs text-muted-foreground">Fraud Score</p>
-                <p className={`font-mono-data font-semibold ${getRiskColor(alert.fraudScore)}`}>
-                  {formatScore(alert.fraudScore)}
+                <p className={`font-mono-data font-semibold ${getRiskColor(score)}`}>
+                  {score != null ? formatScore(score) : "—"}
                 </p>
               </div>
               <div>
@@ -72,12 +83,12 @@ function AlertDetail({ alert, onClose }) {
             <Separator />
 
             {/* SHAP explanation */}
-            {explanation?.reasons && (
+            {reasons && reasons.length > 0 && (
               <div>
                 <h4 className="text-sm font-medium mb-2">ML Explanation</h4>
                 <div className="space-y-2">
-                  {explanation.reasons.map((r, i) => {
-                    const maxImpact = Math.max(...explanation.reasons.map((r) => r.impact || 0), 0.3);
+                  {reasons.map((r, i) => {
+                    const maxImpact = Math.max(...reasons.map((r) => r.impact || 0), 0.3);
                     return (
                       <div key={i}>
                         <div className="flex items-center justify-between text-xs mb-1">
@@ -144,7 +155,7 @@ export default function AlertsPage() {
       <div className="flex-1 space-y-4 p-5">
         {/* Stats row */}
         {stats && (
-          <div className="grid grid-cols-4 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
             {[
               { label: "New", value: stats.byStatus?.NEW || 0, color: "text-blue-600" },
               { label: "Reviewing", value: stats.byStatus?.REVIEWING || 0, color: "text-amber-600" },
@@ -162,15 +173,17 @@ export default function AlertsPage() {
         )}
 
         {/* Tabs */}
-        <Tabs value={statusFilter || "all"} onValueChange={(v) => setStatusFilter(v === "all" ? null : v)}>
-          <TabsList>
-            {STATUS_TABS.map((tab) => (
-              <TabsTrigger key={tab.label} value={tab.value || "all"}>
-                {tab.label}
-              </TabsTrigger>
-            ))}
-          </TabsList>
-        </Tabs>
+        <div className="w-full overflow-x-auto pb-1 mb-2">
+          <Tabs value={statusFilter || "all"} onValueChange={(v) => setStatusFilter(v === "all" ? null : v)}>
+            <TabsList className="w-max md:w-auto flex-nowrap">
+              {STATUS_TABS.map((tab) => (
+                <TabsTrigger key={tab.label} value={tab.value || "all"}>
+                  {tab.label}
+                </TabsTrigger>
+              ))}
+            </TabsList>
+          </Tabs>
+        </div>
 
         {/* Alert List */}
         <div className="space-y-2">
@@ -193,7 +206,7 @@ export default function AlertsPage() {
                 className="cursor-pointer transition-colors hover:border-primary/30"
                 onClick={() => setSelected(alert)}
               >
-                <CardContent className="flex items-center gap-4 p-4">
+                <CardContent className="flex items-center gap-4 p-4 min-w-0 text-left">
                   <Badge variant={getSeverityVariant(alert.severity)} className="shrink-0">
                     {alert.severity}
                   </Badge>
@@ -204,12 +217,12 @@ export default function AlertsPage() {
                       <span className="font-mono-data text-sm">{formatINR(alert.transaction?.amount)}</span>
                     </div>
                     <p className="text-xs text-muted-foreground truncate mt-0.5">
-                      {alert.description || `Fraud score: ${formatScore(alert.fraudScore)}`}
+                      {alert.description || `Fraud score: ${formatScore(alert.fraudScore ?? alert.transaction?.fraudScore)}`}
                     </p>
                   </div>
                   <div className="flex items-center gap-3 shrink-0">
-                    <span className={`font-mono-data text-sm font-semibold ${getRiskColor(alert.fraudScore)}`}>
-                      {formatScore(alert.fraudScore)}
+                    <span className={`font-mono-data text-sm font-semibold ${getRiskColor(alert.fraudScore ?? alert.transaction?.fraudScore)}`}>
+                      {formatScore(alert.fraudScore ?? alert.transaction?.fraudScore)}
                     </span>
                     <Badge variant="outline" className="text-[10px]">{alert.status}</Badge>
                     <span className="text-[10px] text-muted-foreground">{formatRelativeTime(alert.createdAt)}</span>
