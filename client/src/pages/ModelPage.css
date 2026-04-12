@@ -1,0 +1,446 @@
+/* ════════════════════════════════════════════════════════════
+   ML Model Performance — Scoped Premium Styles
+   All rules are scoped under .ml-model-page to avoid global leaks.
+   ════════════════════════════════════════════════════════════ */
+
+/* ── Page Container ── */
+.ml-model-page {
+  padding: 24px 28px 40px;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+/* ── Premium Card Overrides ── */
+.ml-model-page .ml-card {
+  border-radius: 20px;
+  border: 1px solid oklch(0 0 0 / 5%);
+  box-shadow:
+    0 1px 2px oklch(0 0 0 / 3%),
+    0 4px 16px oklch(0 0 0 / 4%);
+  transition: box-shadow 0.25s ease, transform 0.25s ease, border-color 0.25s ease;
+  overflow: hidden;
+}
+
+.ml-model-page .ml-card:hover {
+  box-shadow:
+    0 2px 4px oklch(0 0 0 / 4%),
+    0 8px 28px oklch(0 0 0 / 7%);
+  transform: translateY(-2px);
+  border-color: oklch(0 0 0 / 8%);
+}
+
+/* Dark mode card overrides */
+:is(.dark) .ml-model-page .ml-card {
+  border-color: oklch(1 0 0 / 6%);
+  box-shadow:
+    0 1px 2px oklch(0 0 0 / 15%),
+    0 4px 16px oklch(0 0 0 / 20%);
+}
+
+:is(.dark) .ml-model-page .ml-card:hover {
+  border-color: oklch(1 0 0 / 10%);
+  box-shadow:
+    0 2px 4px oklch(0 0 0 / 20%),
+    0 8px 32px oklch(0 0 0 / 30%);
+}
+
+/* ── Card Header Styling ── */
+.ml-model-page .ml-card-header {
+  padding: 20px 24px 8px;
+}
+
+.ml-model-page .ml-card-title {
+  font-size: 0.9375rem;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.ml-model-page .ml-card-title-icon {
+  width: 32px;
+  height: 32px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.ml-model-page .ml-card-title-icon.brain {
+  background: oklch(0.546 0.245 262.88 / 10%);
+  color: var(--primary);
+}
+
+.ml-model-page .ml-card-title-icon.activity {
+  background: oklch(0.52 0.17 155 / 10%);
+  color: var(--success);
+}
+
+.ml-model-page .ml-card-title-icon.chart {
+  background: oklch(0.72 0.19 60 / 10%);
+  color: var(--warning);
+}
+
+.ml-model-page .ml-card-title-icon.stats {
+  background: oklch(0.62 0.21 310 / 10%);
+  color: oklch(0.62 0.21 310);
+}
+
+/* ── Card Content ── */
+.ml-model-page .ml-card-content {
+  padding: 12px 24px 24px;
+}
+
+/* ── Info Row Styling ── */
+.ml-model-page .ml-info-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 0;
+  border-bottom: 1px solid oklch(0 0 0 / 4%);
+  transition: background-color 0.15s ease;
+}
+
+:is(.dark) .ml-model-page .ml-info-row {
+  border-bottom-color: oklch(1 0 0 / 5%);
+}
+
+.ml-model-page .ml-info-row:last-child {
+  border-bottom: none;
+}
+
+.ml-model-page .ml-info-row:hover {
+  background-color: oklch(0 0 0 / 1.5%);
+  border-radius: 8px;
+  padding-left: 8px;
+  padding-right: 8px;
+  margin-left: -8px;
+  margin-right: -8px;
+}
+
+:is(.dark) .ml-model-page .ml-info-row:hover {
+  background-color: oklch(1 0 0 / 2.5%);
+}
+
+.ml-model-page .ml-info-label {
+  color: var(--muted-foreground);
+  font-size: 0.8125rem;
+  font-weight: 400;
+}
+
+.ml-model-page .ml-info-value {
+  font-weight: 500;
+  font-size: 0.8125rem;
+}
+
+/* ── Pill Badge ── */
+.ml-model-page .ml-pill-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 12px;
+  border-radius: 100px;
+  font-size: 0.75rem;
+  font-weight: 500;
+  transition: all 0.2s ease;
+}
+
+.ml-model-page .ml-pill-badge.secondary {
+  background: var(--secondary);
+  color: var(--secondary-foreground);
+}
+
+/* ── Status Pill ── */
+.ml-model-page .ml-status-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 10px;
+  border-radius: 100px;
+  font-size: 0.75rem;
+  font-weight: 500;
+}
+
+.ml-model-page .ml-status-pill.online {
+  background: oklch(0.52 0.17 155 / 10%);
+  color: oklch(0.52 0.17 155);
+}
+
+:is(.dark) .ml-model-page .ml-status-pill.online {
+  background: oklch(0.696 0.17 162.48 / 12%);
+  color: oklch(0.696 0.17 162.48);
+}
+
+.ml-model-page .ml-status-pill.offline {
+  background: oklch(0.577 0.245 27.33 / 10%);
+  color: oklch(0.577 0.245 27.33);
+}
+
+:is(.dark) .ml-model-page .ml-status-pill.offline {
+  background: oklch(0.637 0.237 25.331 / 12%);
+  color: oklch(0.637 0.237 25.331);
+}
+
+/* ── Stat Cards Grid ── */
+.ml-model-page .ml-stat-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 16px;
+}
+
+.ml-model-page .ml-stat-card {
+  border-radius: 16px;
+  padding: 20px;
+  text-align: center;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  position: relative;
+  overflow: hidden;
+}
+
+.ml-model-page .ml-stat-card::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  transition: opacity 0.25s ease;
+  border-radius: inherit;
+}
+
+.ml-model-page .ml-stat-card:hover {
+  transform: translateY(-1px);
+}
+
+.ml-model-page .ml-stat-card:hover::before {
+  opacity: 1;
+}
+
+.ml-model-page .ml-stat-card.primary {
+  background: oklch(0.546 0.245 262.88 / 6%);
+}
+.ml-model-page .ml-stat-card.primary::before {
+  background: linear-gradient(135deg, oklch(0.546 0.245 262.88 / 4%) 0%, transparent 100%);
+}
+
+:is(.dark) .ml-model-page .ml-stat-card.primary {
+  background: oklch(0.696 0.17 262.88 / 8%);
+}
+
+.ml-model-page .ml-stat-card.danger {
+  background: oklch(0.62 0.20 30 / 6%);
+}
+.ml-model-page .ml-stat-card.danger::before {
+  background: linear-gradient(135deg, oklch(0.62 0.20 30 / 4%) 0%, transparent 100%);
+}
+
+:is(.dark) .ml-model-page .ml-stat-card.danger {
+  background: oklch(0.637 0.237 25.331 / 8%);
+}
+
+.ml-model-page .ml-stat-card.warning {
+  background: oklch(0.78 0.14 60 / 8%);
+}
+.ml-model-page .ml-stat-card.warning::before {
+  background: linear-gradient(135deg, oklch(0.78 0.14 60 / 5%) 0%, transparent 100%);
+}
+
+:is(.dark) .ml-model-page .ml-stat-card.warning {
+  background: oklch(0.769 0.188 70.08 / 8%);
+}
+
+.ml-model-page .ml-stat-card.info {
+  background: oklch(0.60 0.18 250 / 6%);
+}
+.ml-model-page .ml-stat-card.info::before {
+  background: linear-gradient(135deg, oklch(0.60 0.18 250 / 4%) 0%, transparent 100%);
+}
+
+:is(.dark) .ml-model-page .ml-stat-card.info {
+  background: oklch(0.60 0.18 250 / 10%);
+}
+
+.ml-model-page .ml-stat-number {
+  font-size: 1.75rem;
+  font-weight: 700;
+  line-height: 1.2;
+  letter-spacing: -0.02em;
+}
+
+.ml-model-page .ml-stat-label {
+  font-size: 0.6875rem;
+  font-weight: 500;
+  color: var(--muted-foreground);
+  margin-top: 6px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.ml-model-page .ml-stat-icon {
+  width: 28px;
+  height: 28px;
+  margin: 0 auto 8px;
+  opacity: 0.5;
+}
+
+/* ── XGBoost Metrics Panel ── */
+.ml-model-page .ml-metrics-panel {
+  border-radius: 14px;
+  border: 1px solid var(--primary);
+  border-color: oklch(0.546 0.245 262.88 / 12%);
+  padding: 18px 20px;
+  background: oklch(0.546 0.245 262.88 / 3%);
+  margin-top: 8px;
+}
+
+:is(.dark) .ml-model-page .ml-metrics-panel {
+  border-color: oklch(0.696 0.17 262.88 / 15%);
+  background: oklch(0.696 0.17 262.88 / 5%);
+}
+
+.ml-model-page .ml-metrics-title {
+  font-size: 0.8125rem;
+  font-weight: 600;
+  margin-bottom: 14px;
+  color: var(--foreground);
+}
+
+.ml-model-page .ml-metrics-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 10px;
+}
+
+.ml-model-page .ml-metric-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 6px 10px;
+  border-radius: 8px;
+  transition: background-color 0.15s ease;
+  font-size: 0.8125rem;
+}
+
+.ml-model-page .ml-metric-row:hover {
+  background: oklch(0 0 0 / 3%);
+}
+
+:is(.dark) .ml-model-page .ml-metric-row:hover {
+  background: oklch(1 0 0 / 4%);
+}
+
+.ml-model-page .ml-metric-label {
+  color: var(--muted-foreground);
+  font-size: 0.75rem;
+}
+
+.ml-model-page .ml-metric-value {
+  font-weight: 600;
+  font-size: 0.8125rem;
+}
+
+/* ── Fallback Info Box ── */
+.ml-model-page .ml-info-box {
+  border-radius: 14px;
+  border: 1px solid oklch(0.546 0.245 262.88 / 12%);
+  padding: 18px 20px;
+  background: oklch(0.546 0.245 262.88 / 3%);
+  margin-top: 8px;
+}
+
+:is(.dark) .ml-model-page .ml-info-box {
+  border-color: oklch(0.696 0.17 262.88 / 15%);
+  background: oklch(0.696 0.17 262.88 / 5%);
+}
+
+.ml-model-page .ml-info-box-title {
+  font-size: 0.8125rem;
+  font-weight: 600;
+  margin-bottom: 6px;
+  color: var(--foreground);
+}
+
+.ml-model-page .ml-info-box-text {
+  font-size: 0.75rem;
+  color: var(--muted-foreground);
+  line-height: 1.6;
+}
+
+/* ── Description text ── */
+.ml-model-page .ml-description {
+  font-size: 0.75rem;
+  color: var(--muted-foreground);
+  padding-top: 10px;
+  margin-top: 6px;
+  border-top: 1px solid oklch(0 0 0 / 4%);
+  line-height: 1.5;
+}
+
+:is(.dark) .ml-model-page .ml-description {
+  border-top-color: oklch(1 0 0 / 5%);
+}
+
+/* ── Chart Container Overrides ── */
+.ml-model-page .ml-chart-wrapper {
+  height: 380px;
+  width: 100%;
+  padding: 4px 0;
+}
+
+/* Recharts overrides scoped to this page */
+.ml-model-page .recharts-bar-rectangle rect {
+  rx: 6;
+  ry: 6;
+  transition: fill-opacity 0.2s ease;
+}
+
+.ml-model-page .recharts-bar-rectangle:hover rect {
+  fill-opacity: 1 !important;
+  filter: drop-shadow(0 2px 8px oklch(0 0 0 / 15%));
+}
+
+.ml-model-page .recharts-cartesian-axis-tick text {
+  fill: var(--muted-foreground);
+  font-size: 10.5px;
+  font-weight: 400;
+}
+
+.ml-model-page .recharts-cartesian-grid-horizontal line,
+.ml-model-page .recharts-cartesian-grid-vertical line {
+  stroke: oklch(0 0 0 / 3%);
+}
+
+:is(.dark) .ml-model-page .recharts-cartesian-grid-horizontal line,
+:is(.dark) .ml-model-page .recharts-cartesian-grid-vertical line {
+  stroke: oklch(1 0 0 / 4%);
+}
+
+.ml-model-page .recharts-tooltip-wrapper {
+  filter: drop-shadow(0 4px 16px oklch(0 0 0 / 12%)) !important;
+}
+
+/* ── Section Grid ── */
+.ml-model-page .ml-grid-2 {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 24px;
+}
+
+@media (max-width: 768px) {
+  .ml-model-page .ml-grid-2 {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ── Subtle Divider ── */
+.ml-model-page .ml-divider {
+  height: 1px;
+  background: oklch(0 0 0 / 4%);
+  margin: 4px 0;
+  border: none;
+}
+
+:is(.dark) .ml-model-page .ml-divider {
+  background: oklch(1 0 0 / 5%);
+}

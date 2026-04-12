@@ -1,11 +1,11 @@
 import { useEffect, useState, useMemo } from "react";
+import { motion } from "framer-motion";
 import Header from "@/components/layout/Header";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Bar, BarChart, XAxis, YAxis, Tooltip as ReTooltip, Cell } from "recharts";
 import { ChartContainer, ChartTooltipContent } from "@/components/ui/chart";
-import { CheckCircle, XCircle, Brain, Activity } from "lucide-react";
+import { Bar, BarChart, XAxis, YAxis, Tooltip as ReTooltip, Cell } from "recharts";
+import { CheckCircle, XCircle, Brain, Activity, BarChart3, TrendingUp, Target, Zap, Shield, Gauge } from "lucide-react";
 import api from "@/lib/api";
+import "./ModelPage.css";
 
 const RULE_WEIGHTS = [
   { name: "Amount × Channel", weight: 0.25 },
@@ -42,13 +42,69 @@ function featureLabel(key) {
   return map[key] || key.replace(/_/g, " ").replace(/\b\w/g, c => c.toUpperCase());
 }
 
+/* ── Animation Variants ── */
+const containerVariants = {
+  hidden: { opacity: 0 },
+  visible: {
+    opacity: 1,
+    transition: { staggerChildren: 0.08, delayChildren: 0.05 },
+  },
+};
+
+const cardVariants = {
+  hidden: { opacity: 0, y: 18 },
+  visible: {
+    opacity: 1,
+    y: 0,
+    transition: { duration: 0.35, ease: [0.25, 0.46, 0.45, 0.94] },
+  },
+};
+
+const statVariants = {
+  hidden: { opacity: 0, scale: 0.95, y: 12 },
+  visible: {
+    opacity: 1,
+    scale: 1,
+    y: 0,
+    transition: { duration: 0.3, ease: "easeOut" },
+  },
+};
+
+/* ── Smooth bar colors ── */
+const BAR_COLORS = {
+  high: "oklch(0.62 0.20 25)",       // Warm coral (softer than harsh red)
+  mid: "oklch(0.75 0.16 65)",        // Warm amber (softer orange)
+  low: "oklch(0.60 0.18 262.88)",    // Primary blue
+};
+
+const BAR_COLORS_DARK = {
+  high: "oklch(0.68 0.20 28)",
+  mid: "oklch(0.78 0.16 68)",
+  low: "oklch(0.70 0.17 262.88)",
+};
+
+function getBarColor(index, isDark) {
+  const colors = isDark ? BAR_COLORS_DARK : BAR_COLORS;
+  if (index < 3) return colors.high;
+  if (index < 7) return colors.mid;
+  return colors.low;
+}
+
 export default function ModelPage() {
   const [modelInfo, setModelInfo] = useState(null);
   const [txnStats, setTxnStats] = useState(null);
+  const [isDark, setIsDark] = useState(false);
 
   useEffect(() => {
     api.get("/ml/model-info").then((r) => setModelInfo(r.data)).catch(() => {});
     api.get("/transactions/stats").then((r) => setTxnStats(r.data)).catch(() => {});
+
+    // Detect dark mode
+    const checkDark = () => setIsDark(document.documentElement.classList.contains("dark"));
+    checkDark();
+    const obs = new MutationObserver(checkDark);
+    obs.observe(document.documentElement, { attributes: true, attributeFilter: ["class"] });
+    return () => obs.disconnect();
   }, []);
 
   const activeModel = modelInfo?.activeModel;
@@ -69,178 +125,263 @@ export default function ModelPage() {
   return (
     <>
       <Header title="ML Model Performance" subtitle="Scoring pipeline status & metrics" />
-      <div className="flex-1 space-y-4 p-5">
-        {/* Status cards */}
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm flex items-center gap-2">
-                <Brain className="h-4 w-4 text-primary" /> Active Model
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-2 text-sm">
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Name</span>
-                <span className="font-mono-data font-medium">{activeModel?.modelName || "—"}</span>
+      <motion.div
+        className="ml-model-page"
+        variants={containerVariants}
+        initial="hidden"
+        animate="visible"
+      >
+        {/* ── Status Cards Row ── */}
+        <div className="ml-grid-2">
+          {/* Active Model Card */}
+          <motion.div className="ml-card" variants={cardVariants} whileHover={{ y: -3 }}>
+            <div className="ml-card-header">
+              <div className="ml-card-title">
+                <div className="ml-card-title-icon brain">
+                  <Brain className="h-4 w-4" />
+                </div>
+                Active Model
               </div>
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Type</span>
-                <Badge variant="secondary">{isRuleBased ? "Rule-Based Heuristic" : activeModel?.type || "XGBoost ML"}</Badge>
+            </div>
+            <div className="ml-card-content" style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
+              <div className="ml-info-row">
+                <span className="ml-info-label">Name</span>
+                <span className="ml-info-value font-mono-data">{activeModel?.modelName || "—"}</span>
               </div>
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Version</span>
-                <span className="font-mono-data">{activeModel?.version || "v1"}</span>
+              <div className="ml-info-row">
+                <span className="ml-info-label">Type</span>
+                <span className="ml-pill-badge secondary">
+                  {isRuleBased ? "Rule-Based Heuristic" : activeModel?.type || "XGBoost ML"}
+                </span>
               </div>
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Status</span>
-                <span className="flex items-center gap-1 text-emerald-600">
+              <div className="ml-info-row">
+                <span className="ml-info-label">Version</span>
+                <span className="ml-info-value font-mono-data">{activeModel?.version || "v1"}</span>
+              </div>
+              <div className="ml-info-row">
+                <span className="ml-info-label">Status</span>
+                <span className="ml-status-pill online">
                   <CheckCircle className="h-3.5 w-3.5" /> Active
                 </span>
               </div>
               {!isRuleBased && activeModel?.description && (
-                <div className="text-xs text-muted-foreground pt-1 border-t">
+                <div className="ml-description">
                   {activeModel.description}
                 </div>
               )}
-            </CardContent>
-          </Card>
+            </div>
+          </motion.div>
 
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm flex items-center gap-2">
-                <Activity className="h-4 w-4 text-primary" /> Service Status
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-2 text-sm">
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">FastAPI ML Service</span>
-                <span className="flex items-center gap-1">
-                  {modelInfo?.fastApiAvailable ? (
-                    <><CheckCircle className="h-3.5 w-3.5 text-emerald-600" /> Online</>
-                  ) : (
-                    <><XCircle className="h-3.5 w-3.5 text-destructive" /> Offline</>
-                  )}
-                </span>
+          {/* Service Status Card */}
+          <motion.div className="ml-card" variants={cardVariants} whileHover={{ y: -3 }}>
+            <div className="ml-card-header">
+              <div className="ml-card-title">
+                <div className="ml-card-title-icon activity">
+                  <Activity className="h-4 w-4" />
+                </div>
+                Service Status
               </div>
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Fallback Engine</span>
-                <span className="flex items-center gap-1 text-emerald-600">
+            </div>
+            <div className="ml-card-content" style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
+              <div className="ml-info-row">
+                <span className="ml-info-label">FastAPI ML Service</span>
+                {modelInfo?.fastApiAvailable ? (
+                  <span className="ml-status-pill online">
+                    <CheckCircle className="h-3.5 w-3.5" /> Online
+                  </span>
+                ) : (
+                  <span className="ml-status-pill offline">
+                    <XCircle className="h-3.5 w-3.5" /> Offline
+                  </span>
+                )}
+              </div>
+              <div className="ml-info-row">
+                <span className="ml-info-label">Fallback Engine</span>
+                <span className="ml-status-pill online">
                   <CheckCircle className="h-3.5 w-3.5" /> Active
                 </span>
               </div>
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Features</span>
-                <span className="font-mono-data">{activeModel?.rulesCount || 12} {isRuleBased ? "rules" : "features"}</span>
+              <div className="ml-info-row">
+                <span className="ml-info-label">Features</span>
+                <span className="ml-info-value font-mono-data">
+                  {activeModel?.rulesCount || 12} {isRuleBased ? "rules" : "features"}
+                </span>
               </div>
               {!isRuleBased && (
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">AUC-ROC</span>
-                  <span className="font-mono-data font-semibold text-primary">{metrics?.auc_roc || "—"}</span>
+                <div className="ml-info-row">
+                  <span className="ml-info-label">AUC-ROC</span>
+                  <span className="ml-info-value font-mono-data" style={{ color: 'var(--primary)', fontWeight: 700 }}>
+                    {metrics?.auc_roc || "—"}
+                  </span>
                 </div>
               )}
-            </CardContent>
-          </Card>
+            </div>
+          </motion.div>
         </div>
 
-        {/* Feature importance / Rule Weights */}
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm">
+        {/* ── Feature Importance + Detection Summary ── */}
+        <div className="ml-grid-2">
+          {/* Feature Importance / Rule Weights Chart */}
+          <motion.div className="ml-card" variants={cardVariants} whileHover={{ y: -3 }}>
+            <div className="ml-card-header">
+              <div className="ml-card-title">
+                <div className="ml-card-title-icon chart">
+                  <BarChart3 className="h-4 w-4" />
+                </div>
                 {isRuleBased ? "Rule Impact Weights" : "XGBoost Feature Importance (Top 15)"}
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="pb-3">
-              <ChartContainer config={chartConfig} className="h-[360px] w-full">
+              </div>
+            </div>
+            <div className="ml-card-content">
+              <ChartContainer config={chartConfig} className="ml-chart-wrapper">
                 <BarChart
                   data={featureData || [...RULE_WEIGHTS].sort((a, b) => b.weight - a.weight)}
                   layout="vertical"
-                  margin={{ top: 5, right: 15, bottom: 5, left: 120 }}
+                  margin={{ top: 5, right: 20, bottom: 5, left: 120 }}
                 >
-                  <XAxis type="number" tick={{ fontSize: 10 }} stroke="var(--muted-foreground)" />
-                  <YAxis type="category" dataKey="name" tick={{ fontSize: 10 }} stroke="var(--muted-foreground)" width={115} />
-                  <ReTooltip content={<ChartTooltipContent />} />
-                  <Bar dataKey="weight" radius={[0, 4, 4, 0]}>
+                  <XAxis
+                    type="number"
+                    tick={{ fontSize: 10.5, fill: 'var(--muted-foreground)' }}
+                    stroke="var(--muted-foreground)"
+                    strokeOpacity={0.2}
+                    axisLine={false}
+                    tickLine={false}
+                  />
+                  <YAxis
+                    type="category"
+                    dataKey="name"
+                    tick={{ fontSize: 10.5, fill: 'var(--muted-foreground)' }}
+                    stroke="var(--muted-foreground)"
+                    strokeOpacity={0}
+                    width={115}
+                    tickLine={false}
+                    axisLine={false}
+                  />
+                  <ReTooltip
+                    content={<ChartTooltipContent />}
+                    cursor={{ fill: 'oklch(0 0 0 / 3%)', radius: 6 }}
+                  />
+                  <Bar dataKey="weight" radius={[0, 8, 8, 0]} barSize={18}>
                     {(featureData || [...RULE_WEIGHTS].sort((a, b) => b.weight - a.weight)).map((_, i) => (
-                      <Cell key={i} fill={i < 3 ? "var(--destructive)" : i < 7 ? "var(--warning)" : "var(--primary)"} fillOpacity={0.8} />
+                      <Cell
+                        key={i}
+                        fill={getBarColor(i, isDark)}
+                        fillOpacity={0.75}
+                        className="transition-all duration-200"
+                      />
                     ))}
                   </Bar>
                 </BarChart>
               </ChartContainer>
-            </CardContent>
-          </Card>
+            </div>
+          </motion.div>
 
           {/* Detection Summary */}
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm">Detection Summary</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid grid-cols-2 gap-4 text-center">
-                <div className="rounded-lg bg-primary/10 p-4">
-                  <p className="font-mono-data text-2xl font-bold text-primary">{txnStats?.total || 0}</p>
-                  <p className="text-xs text-muted-foreground mt-1">Total Scored</p>
+          <motion.div className="ml-card" variants={cardVariants} whileHover={{ y: -3 }}>
+            <div className="ml-card-header">
+              <div className="ml-card-title">
+                <div className="ml-card-title-icon stats">
+                  <TrendingUp className="h-4 w-4" />
                 </div>
-                <div className="rounded-lg bg-destructive/10 p-4">
-                  <p className="font-mono-data text-2xl font-bold text-destructive">{txnStats?.fraudCount || 0}</p>
-                  <p className="text-xs text-muted-foreground mt-1">Flagged Fraud</p>
-                </div>
-                <div className="rounded-lg bg-warning/10 p-4">
-                  <p className="font-mono-data text-2xl font-bold text-amber-600">
+                Detection Summary
+              </div>
+            </div>
+            <div className="ml-card-content" style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+              {/* Stat Cards */}
+              <motion.div
+                className="ml-stat-grid"
+                variants={containerVariants}
+                initial="hidden"
+                animate="visible"
+              >
+                <motion.div className="ml-stat-card primary" variants={statVariants} whileHover={{ scale: 1.03 }}>
+                  <Target className="ml-stat-icon" style={{ color: 'var(--primary)' }} />
+                  <p className="ml-stat-number font-mono-data" style={{ color: 'var(--primary)' }}>
+                    {txnStats?.total || 0}
+                  </p>
+                  <p className="ml-stat-label">Total Scored</p>
+                </motion.div>
+
+                <motion.div className="ml-stat-card danger" variants={statVariants} whileHover={{ scale: 1.03 }}>
+                  <Shield className="ml-stat-icon" style={{ color: 'oklch(0.62 0.20 30)' }} />
+                  <p className="ml-stat-number font-mono-data" style={{ color: 'var(--destructive)' }}>
+                    {txnStats?.fraudCount || 0}
+                  </p>
+                  <p className="ml-stat-label">Flagged Fraud</p>
+                </motion.div>
+
+                <motion.div className="ml-stat-card warning" variants={statVariants} whileHover={{ scale: 1.03 }}>
+                  <Zap className="ml-stat-icon" style={{ color: 'oklch(0.72 0.16 60)' }} />
+                  <p className="ml-stat-number font-mono-data" style={{ color: 'oklch(0.72 0.16 60)' }}>
                     {txnStats?.fraudRate || "0%"}
                   </p>
-                  <p className="text-xs text-muted-foreground mt-1">Detection Rate</p>
-                </div>
-                <div className="rounded-lg bg-blue-500/10 p-4">
-                  <p className="font-mono-data text-2xl font-bold text-blue-600">
+                  <p className="ml-stat-label">Detection Rate</p>
+                </motion.div>
+
+                <motion.div className="ml-stat-card info" variants={statVariants} whileHover={{ scale: 1.03 }}>
+                  <Gauge className="ml-stat-icon" style={{ color: 'oklch(0.55 0.18 250)' }} />
+                  <p className="ml-stat-number font-mono-data" style={{ color: 'oklch(0.55 0.18 250)' }}>
                     {txnStats?.avgFraudScore ? parseFloat(txnStats.avgFraudScore).toFixed(2) : "0.00"}
                   </p>
-                  <p className="text-xs text-muted-foreground mt-1">Avg Fraud Score</p>
-                </div>
-              </div>
+                  <p className="ml-stat-label">Avg Fraud Score</p>
+                </motion.div>
+              </motion.div>
 
+              {/* XGBoost Metrics */}
               {!isRuleBased && (
-                <div className="rounded-lg border border-primary/20 p-3 text-xs">
-                  <p className="font-medium text-foreground mb-2">XGBoost Metrics</p>
-                  <div className="grid grid-cols-2 gap-2">
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">AUC-ROC:</span>
-                      <span className="font-mono-data font-semibold">{metrics?.auc_roc || "—"}</span>
+                <motion.div
+                  className="ml-metrics-panel"
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.4, duration: 0.3 }}
+                >
+                  <p className="ml-metrics-title">XGBoost Metrics</p>
+                  <div className="ml-metrics-grid">
+                    <div className="ml-metric-row">
+                      <span className="ml-metric-label">AUC-ROC</span>
+                      <span className="ml-metric-value font-mono-data">{metrics?.auc_roc || "—"}</span>
                     </div>
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">AUC-PR:</span>
-                      <span className="font-mono-data font-semibold">{metrics?.auc_pr || "—"}</span>
+                    <div className="ml-metric-row">
+                      <span className="ml-metric-label">AUC-PR</span>
+                      <span className="ml-metric-value font-mono-data">{metrics?.auc_pr || "—"}</span>
                     </div>
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">Precision:</span>
-                      <span className="font-mono-data font-semibold">{metrics?.precision || "—"}</span>
+                    <div className="ml-metric-row">
+                      <span className="ml-metric-label">Precision</span>
+                      <span className="ml-metric-value font-mono-data">{metrics?.precision || "—"}</span>
                     </div>
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">Recall:</span>
-                      <span className="font-mono-data font-semibold">{metrics?.recall || "—"}</span>
+                    <div className="ml-metric-row">
+                      <span className="ml-metric-label">Recall</span>
+                      <span className="ml-metric-value font-mono-data">{metrics?.recall || "—"}</span>
                     </div>
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">F1 Score:</span>
-                      <span className="font-mono-data font-semibold">{metrics?.f1 || "—"}</span>
+                    <div className="ml-metric-row">
+                      <span className="ml-metric-label">F1 Score</span>
+                      <span className="ml-metric-value font-mono-data">{metrics?.f1 || "—"}</span>
                     </div>
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">Threshold:</span>
-                      <span className="font-mono-data font-semibold">0.70</span>
+                    <div className="ml-metric-row">
+                      <span className="ml-metric-label">Threshold</span>
+                      <span className="ml-metric-value font-mono-data">0.70</span>
                     </div>
                   </div>
-                </div>
+                </motion.div>
               )}
 
+              {/* Fallback info */}
               {isRuleBased && (
-                <div className="rounded-lg border border-primary/20 p-3 text-xs text-muted-foreground">
-                  <p className="font-medium text-foreground mb-1">When FastAPI ML Service is Connected</p>
-                  <p>This page will automatically switch to showing XGBoost metrics: AUC-PR, Precision, Recall, F1 Score, and Confusion Matrix.</p>
-                </div>
+                <motion.div
+                  className="ml-info-box"
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.4, duration: 0.3 }}
+                >
+                  <p className="ml-info-box-title">When FastAPI ML Service is Connected</p>
+                  <p className="ml-info-box-text">
+                    This page will automatically switch to showing XGBoost metrics: AUC-PR, Precision, Recall, F1 Score, and Confusion Matrix.
+                  </p>
+                </motion.div>
               )}
-            </CardContent>
-          </Card>
+            </div>
+          </motion.div>
         </div>
-      </div>
+      </motion.div>
     </>
   );
 }
