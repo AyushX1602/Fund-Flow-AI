@@ -1,5 +1,6 @@
 const prisma = require("../prismaClient");
 const mlService = require("./mlService");
+const riskEngine = require("./riskEngine");
 const { createAuditLog } = require("./auditService");
 const { generateTransactionId, parseUpiVpa } = require("../utils/helpers");
 const { AUDIT_ACTIONS, SOCKET_EVENTS } = require("../utils/constants");
@@ -134,23 +135,28 @@ async function processTransaction(data, userId = null) {
     },
   });
 
-  // Auto-generate alert if fraud score exceeds threshold
+  // Compute 6-layer composite risk score
+  const riskProfile = await riskEngine.computeRiskLayers(scoredTransaction, senderAccount, receiverAccount);
+  logger.info(`Risk layers for ${scoredTransaction.transactionId}: composite=${riskProfile.compositeScore} dominant=${riskProfile.dominantLayer}`);
+
+  // Auto-generate alert if fraud score OR composite score exceeds threshold
   let alert = null;
-  if (mlResult.isFraud || mlResult.fraudScore >= config.alertThreshold) {
-    alert = await createAlertForTransaction(scoredTransaction, mlResult);
+  const effectiveScore = Math.max(mlResult.fraudScore, riskProfile.compositeScore);
+  if (mlResult.isFraud || effectiveScore >= config.alertThreshold) {
+    alert = await createAlertForTransaction(scoredTransaction, mlResult, riskProfile);
   }
 
   // Update account risk scores
   await updateAccountRiskScores(senderAccount.id);
   await updateAccountRiskScores(receiverAccount.id);
 
-  return { transaction: scoredTransaction, mlResult, alert };
+  return { transaction: scoredTransaction, mlResult, riskProfile, alert };
 }
 
 /**
  * Create an alert for a flagged transaction.
  */
-async function createAlertForTransaction(transaction, mlResult) {
+async function createAlertForTransaction(transaction, mlResult, riskProfile = null) {
   const severity = getSeverityFromScore(mlResult.fraudScore);
   const alertType = getAlertType(mlResult);
 
@@ -160,7 +166,7 @@ async function createAlertForTransaction(transaction, mlResult) {
         alertType,
         severity,
         transactionId: transaction.id,
-        description: buildAlertDescription(transaction, mlResult),
+        description: buildAlertDescription(transaction, mlResult, riskProfile),
         riskScore: mlResult.fraudScore,
         mlReasons: mlResult.reasons,
       },
@@ -267,11 +273,16 @@ function getAlertType(mlResult) {
 /**
  * Build human-readable alert description.
  */
-function buildAlertDescription(transaction, mlResult) {
+function buildAlertDescription(transaction, mlResult, riskProfile = null) {
   const topReasons = (mlResult.reasons || []).slice(0, 3).map((r) => r.description).join("; ");
-  return `Fraud alert for ${transaction.type} transaction of ₹${transaction.amount.toLocaleString()} ` +
+  let desc = `Fraud alert for ${transaction.type} transaction of ₹${transaction.amount.toLocaleString()} ` +
     `(Score: ${mlResult.fraudScore}). ${topReasons}`;
+  if (riskProfile) {
+    desc += `. Composite risk: ${riskProfile.compositeScore} [dominant: ${riskProfile.dominantLayer}]`;
+  }
+  return desc;
 }
+
 
 module.exports = {
   processTransaction,
