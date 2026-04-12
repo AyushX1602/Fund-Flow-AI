@@ -94,6 +94,7 @@ function getBarColor(index, isDark) {
 function ResponsiveRadarChart({ data, isDark }) {
   const gridColor = isDark ? "oklch(1 0 0 / 8%)" : "oklch(0 0 0 / 8%)";
   const tickColor = isDark ? "oklch(0.75 0 0)" : "oklch(0.45 0 0)";
+  const dotStyle = { r: 4, fill: RADAR_GREEN_STROKE, strokeWidth: 2, stroke: isDark ? "oklch(0.18 0.006 265)" : "#fff" };
 
   return (
     <RadarChart
@@ -141,6 +142,7 @@ function ResponsiveRadarChart({ data, isDark }) {
         }}
         itemStyle={{ color: RADAR_GREEN_STROKE, fontWeight: 600 }}
         labelStyle={{ color: tickColor, fontWeight: 500, marginBottom: 2 }}
+        cursor={false}
       />
       <Radar
         name="Score"
@@ -149,8 +151,9 @@ function ResponsiveRadarChart({ data, isDark }) {
         strokeWidth={2}
         fill={RADAR_GREEN_FILL}
         fillOpacity={RADAR_GREEN_FILL_OPACITY}
-        dot={{ r: 4, fill: RADAR_GREEN_STROKE, strokeWidth: 2, stroke: isDark ? "oklch(0.18 0.006 265)" : "#fff" }}
-        activeDot={{ r: 6, fill: RADAR_GREEN_STROKE, stroke: isDark ? "oklch(0.18 0.006 265)" : "#fff", strokeWidth: 2 }}
+        dot={dotStyle}
+        activeDot={dotStyle}
+        isAnimationActive={false}
       />
     </RadarChart>
   );

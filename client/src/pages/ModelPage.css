@@ -550,3 +550,16 @@
   fill-opacity: 0.4 !important;
 }
 
+/* ── Suppress recharts hover "spoke" line from center ── */
+/* The active line recharts draws from center to hovered vertex */
+.ml-model-page .recharts-polar-angle-axis line,
+.ml-model-page .recharts-active-line {
+  display: none !important;
+}
+
+/* Keep polar grid lines (polygon) visible — only hide the spoke cursor lines */
+.ml-model-page .recharts-polar-grid-concentric-polygon,
+.ml-model-page .recharts-polar-grid-concentric-path {
+  /* These are the grid polygon rings — leave them visible */
+  display: block !important;
+}
