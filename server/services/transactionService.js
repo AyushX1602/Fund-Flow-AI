@@ -157,8 +157,18 @@ async function processTransaction(data, userId = null) {
  * Create an alert for a flagged transaction.
  */
 async function createAlertForTransaction(transaction, mlResult, riskProfile = null) {
-  const severity = getSeverityFromScore(mlResult.fraudScore);
-  const alertType = getAlertType(mlResult);
+  // Use the higher of ML score or composite score — whichever triggered the alert
+  const effectiveScore = riskProfile
+    ? Math.max(mlResult.fraudScore, riskProfile.compositeScore)
+    : mlResult.fraudScore;
+
+  const severity    = getSeverityFromScore(effectiveScore);
+  const alertType   = getAlertType(mlResult);
+
+  // Track which brain was the dominant trigger
+  const triggeredBy = riskProfile && riskProfile.compositeScore > mlResult.fraudScore
+    ? `6-layer [dominant: ${riskProfile.dominantLayer}]`
+    : "ml-model";
 
   try {
     const alert = await prisma.alert.create({
@@ -167,8 +177,15 @@ async function createAlertForTransaction(transaction, mlResult, riskProfile = nu
         severity,
         transactionId: transaction.id,
         description: buildAlertDescription(transaction, mlResult, riskProfile),
-        riskScore: mlResult.fraudScore,
-        mlReasons: mlResult.reasons,
+        riskScore: effectiveScore,      // ← effective score, not just ML
+        mlReasons: {
+          reasons:        mlResult.reasons,
+          mlScore:        mlResult.fraudScore,
+          compositeScore: riskProfile?.compositeScore ?? null,
+          layers:         riskProfile?.layers ?? null,
+          dominantLayer:  riskProfile?.dominantLayer ?? null,
+          triggeredBy,
+        },
       },
     });
 

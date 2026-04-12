@@ -39,10 +39,18 @@ function AlertDetail({ alert, onClose }) {
 
   if (!alert) return null;
 
-  // Fraud score lives on the transaction, not the alert
-  const score = alert.fraudScore ?? alert.transaction?.fraudScore ?? null;
+  // Pull both scores from the enriched mlReasons object
+  const mlReasons   = alert.mlReasons   || {};
+  const mlScore     = mlReasons.mlScore  ?? alert.transaction?.fraudScore ?? null;
+  const composite   = mlReasons.compositeScore ?? null;
+  const layers      = mlReasons.layers   ?? null;
+  const dominantLayer = mlReasons.dominantLayer ?? null;
+  const triggeredBy = mlReasons.triggeredBy ?? null;
+  const effectiveScore = alert.riskScore ?? mlScore;
+
   const reasons = explanation?.reasons
     || explanation?.explanation?.reasons
+    || mlReasons.reasons
     || null;
 
   return (
@@ -59,15 +67,16 @@ function AlertDetail({ alert, onClose }) {
           <div className="space-y-4 pr-4">
             <p className="text-sm text-muted-foreground">{alert.description}</p>
 
+            {/* ── Score grid ─────────────────────────── */}
             <div className="grid grid-cols-2 gap-3 text-sm">
               <div>
                 <p className="text-xs text-muted-foreground">Amount</p>
                 <p className="font-mono-data font-semibold">{formatINR(alert.transaction?.amount)}</p>
               </div>
               <div>
-                <p className="text-xs text-muted-foreground">Fraud Score</p>
-                <p className={`font-mono-data font-semibold ${getRiskColor(score)}`}>
-                  {score != null ? formatScore(score) : "—"}
+                <p className="text-xs text-muted-foreground">Effective Score</p>
+                <p className={`font-mono-data font-bold text-base ${getRiskColor(effectiveScore)}`}>
+                  {effectiveScore != null ? formatScore(effectiveScore) : "—"}
                 </p>
               </div>
               <div>
@@ -78,6 +87,48 @@ function AlertDetail({ alert, onClose }) {
                 <p className="text-xs text-muted-foreground">Created</p>
                 <p>{formatRelativeTime(alert.createdAt)}</p>
               </div>
+            </div>
+
+            {/* ── Dual brain scores ──────────────────── */}
+            <div className="rounded-lg border bg-muted/30 p-3 space-y-2">
+              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Intelligence Sources</p>
+              <div className="flex items-center justify-between text-xs">
+                <span className="flex items-center gap-1.5">
+                  <span className="h-2 w-2 rounded-full bg-violet-500" />
+                  🤖 ML Model (XGBoost)
+                </span>
+                <span className={`font-mono-data font-bold ${getRiskColor(mlScore)}`}>
+                  {mlScore != null ? formatScore(mlScore) : "—"}
+                  {triggeredBy === "ml-model" && <span className="ml-1 text-[9px] bg-violet-100 text-violet-700 px-1 rounded">TRIGGERED</span>}
+                </span>
+              </div>
+              <div className="flex items-center justify-between text-xs">
+                <span className="flex items-center gap-1.5">
+                  <span className="h-2 w-2 rounded-full bg-emerald-500" />
+                  🛡️ 6-Layer Engine {dominantLayer && <span className="text-muted-foreground">· {dominantLayer}</span>}
+                </span>
+                <span className={`font-mono-data font-bold ${getRiskColor(composite)}`}>
+                  {composite != null ? formatScore(composite) : "—"}
+                  {triggeredBy && triggeredBy !== "ml-model" && <span className="ml-1 text-[9px] bg-emerald-100 text-emerald-700 px-1 rounded">TRIGGERED</span>}
+                </span>
+              </div>
+              {/* 6-layer bar breakdown */}
+              {layers && (
+                <div className="pt-1 space-y-1">
+                  {Object.entries(layers).map(([key, val]) => (
+                    <div key={key} className="flex items-center gap-2">
+                      <span className="w-20 text-[10px] text-muted-foreground capitalize shrink-0">{key}</span>
+                      <div className="flex-1 h-1.5 rounded-full bg-border">
+                        <div
+                          className={`h-full rounded-full transition-all ${val >= 0.7 ? 'bg-red-500' : val >= 0.4 ? 'bg-amber-500' : 'bg-emerald-500'}`}
+                          style={{ width: `${val * 100}%` }}
+                        />
+                      </div>
+                      <span className="text-[10px] font-mono-data text-muted-foreground w-8 text-right">{(val).toFixed(2)}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
 
             <Separator />
