@@ -444,3 +444,109 @@
 :is(.dark) .ml-model-page .ml-divider {
   background: oklch(1 0 0 / 5%);
 }
+
+/* ════════════════════════════════════════════════════════════
+   Radar / Overview Chart
+   ════════════════════════════════════════════════════════════ */
+
+/* Title icon */
+.ml-model-page .ml-card-title-icon.radar {
+  background: oklch(0.52 0.17 155 / 10%);
+  color: oklch(0.52 0.17 155);
+}
+
+:is(.dark) .ml-model-page .ml-card-title-icon.radar {
+  background: oklch(0.696 0.17 162.48 / 12%);
+  color: oklch(0.696 0.17 162.48);
+}
+
+/* Full-width card for radar */
+.ml-model-page .ml-radar-card {
+  width: 100%;
+}
+
+/* Inner layout: chart left, legend right on desktop */
+.ml-model-page .ml-radar-content {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+/* Chart responsive wrapper */
+.ml-model-page .ml-radar-chart-wrap {
+  width: 100%;
+  height: 320px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.ml-model-page .ml-radar-chart-wrap svg {
+  overflow: visible;
+}
+
+/* Legend strip */
+.ml-model-page .ml-radar-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 20px;
+  justify-content: center;
+  padding: 0 8px 4px;
+}
+
+.ml-model-page .ml-radar-legend-item {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 0.8rem;
+  transition: transform 0.15s ease;
+}
+
+.ml-model-page .ml-radar-legend-item:hover {
+  transform: translateY(-1px);
+}
+
+.ml-model-page .ml-radar-legend-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: oklch(0.52 0.17 155);
+  flex-shrink: 0;
+  box-shadow: 0 0 0 2px oklch(0.52 0.17 155 / 20%);
+}
+
+:is(.dark) .ml-model-page .ml-radar-legend-dot {
+  background: oklch(0.696 0.17 162.48);
+  box-shadow: 0 0 0 2px oklch(0.696 0.17 162.48 / 20%);
+}
+
+.ml-model-page .ml-radar-legend-metric {
+  color: var(--muted-foreground);
+  font-weight: 400;
+}
+
+.ml-model-page .ml-radar-legend-value {
+  color: oklch(0.52 0.17 155);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  font-family: 'Geist Mono Variable', ui-monospace, monospace;
+}
+
+:is(.dark) .ml-model-page .ml-radar-legend-value {
+  color: oklch(0.696 0.17 162.48);
+}
+
+/* Recharts radar polygon glow on hover */
+.ml-model-page .recharts-polar-grid-concentric polygon,
+.ml-model-page .recharts-polar-grid-concentric path {
+  transition: opacity 0.2s ease;
+}
+
+.ml-model-page .recharts-radar-polygon {
+  transition: fill-opacity 0.25s ease;
+}
+
+.ml-model-page .recharts-radar-polygon:hover {
+  fill-opacity: 0.4 !important;
+}
+
