@@ -160,13 +160,15 @@ function AlertDetail({ alert, onClose }) {
               </div>
             )}
 
-            {/* ── Gemini LLM Panel (only when available) ────── */}
-            {llm && (
+            {/* ── Gemini LLM Panel ──────────────────────────── */}
+            {llm ? (
+              /* Full panel: LLM analysis is present */
               <div className="rounded-lg border bg-gradient-to-br from-violet-50 to-blue-50 dark:from-violet-950/20 dark:to-blue-950/20 p-3 space-y-2">
                 <div className="flex items-center justify-between">
                   <p className="text-xs font-semibold text-violet-700 dark:text-violet-400 uppercase tracking-wider flex items-center gap-1.5">
                     ✨ Gemini AI Analysis
                     {llm.fromCache && <span className="text-[9px] bg-violet-100 text-violet-600 px-1 rounded">cached</span>}
+                    <span className="text-[9px] bg-violet-100 text-violet-600 px-1 rounded">{llm.model || "gemini-2.0-flash"}</span>
                   </p>
                   <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${
                     llm.verdict === 'SUSPICIOUS' ? 'bg-red-100 text-red-700' :
@@ -187,7 +189,23 @@ function AlertDetail({ alert, onClose }) {
                   </div>
                 )}
               </div>
-            )}
+            ) : effectiveScore >= 0.35 && effectiveScore <= 0.75 ? (
+              /* Placeholder: score is uncertain zone but LLM quota exhausted or pending */
+              <div className="rounded-lg border border-dashed border-violet-300 dark:border-violet-800 bg-violet-50/40 dark:bg-violet-950/10 p-3">
+                <div className="flex items-center gap-2">
+                  <span className="text-base">✨</span>
+                  <div>
+                    <p className="text-xs font-semibold text-violet-600 dark:text-violet-400">
+                      Gemini AI Analysis — Queued
+                    </p>
+                    <p className="text-[11px] text-muted-foreground mt-0.5">
+                      This is an uncertain-zone transaction (score {(effectiveScore * 100).toFixed(0)}%) eligible for LLM review.
+                      Analysis runs after API quota resets or on next uncertain transaction within rate limit.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            ) : null}
 
             <Separator />
 

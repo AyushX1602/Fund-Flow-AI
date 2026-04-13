@@ -32,6 +32,21 @@ const CHANNEL_RISK = {
 // In India PSB context, certain bank combinations signal elevated risk
 const HIGH_RISK_BANK_KEYWORDS = ["cooperative", "urban", "gramin", "rural", "nidhi"];
 
+// ─── City-tier map for India (based on RBI financial inclusion tiers) ─────
+// Tier-1: High-density metros with regulated banking infrastructure
+const TIER1_CITIES = new Set([
+  "mumbai", "delhi", "bangalore", "bengaluru", "hyderabad", "chennai",
+  "kolkata", "pune", "ahmedabad", "surat", "jaipur", "lucknow",
+]);
+// Tier-3: Low-density cities with historically weaker AML enforcement
+const TIER3_CITIES = new Set([
+  "bhagalpur", "muzaffarpur", "dhule", "aligarh", "bareilly", "moradabad",
+  "saharanpur", "gorakhpur", "ghazipur", "mau", "azamgarh", "sitapur",
+  "hardoi", "unnao", "balrampur", "gonda", "bahraich", "shravasti",
+]);
+// High-risk UPI PSPs (cooperative / small payment banks)
+const HIGH_RISK_PSPS = new Set(["ibl", "fino", "paytm", "airtel"]);
+
 // ─── Weights for weighted average (must sum to 1.0) ──────────────────────
 const LAYER_WEIGHTS = {
   L1_location:   0.12,
@@ -54,8 +69,8 @@ async function computeRiskLayers(transaction, senderAccount, receiverAccount) {
   const layers = {};
 
   // ── L1: Location Anomaly ─────────────────────────────────────────────────
-  // Score based on whether sender/receiver banks suggest cross-state or high-risk transfers
-  layers.L1_location = computeLocationRisk(senderAccount, receiverAccount);
+  // Combines bank-tier risk + city-tier risk + PSP cross-region signal
+  layers.L1_location = computeLocationRisk(transaction, senderAccount, receiverAccount);
 
   // ── L2: Channel Trust ────────────────────────────────────────────────────
   // Each channel has an inherent risk profile
@@ -108,24 +123,37 @@ async function computeRiskLayers(transaction, senderAccount, receiverAccount) {
 
 // ─── Layer Implementations ────────────────────────────────────────────────
 
-function computeLocationRisk(senderAccount, receiverAccount) {
+function computeLocationRisk(transaction, senderAccount, receiverAccount) {
   let risk = 0.1; // baseline
 
-  const senderBank = (senderAccount?.bankName || "").toLowerCase();
-  const receiverBank = (receiverAccount?.bankName || "").toLowerCase();
+  const senderBank    = (senderAccount?.bankName  || "").toLowerCase();
+  const receiverBank  = (receiverAccount?.bankName || "").toLowerCase();
+  const originCity    = (transaction?.location     || "").toLowerCase();
 
-  // High-risk keyword banks (cooperative, gramin, rural banks have weaker KYC)
-  const senderHighRisk = HIGH_RISK_BANK_KEYWORDS.some(k => senderBank.includes(k));
+  // ── Bank keyword risk (cooperative / gramin = weaker KYC) ───────────────
+  const senderHighRisk   = HIGH_RISK_BANK_KEYWORDS.some(k => senderBank.includes(k));
   const receiverHighRisk = HIGH_RISK_BANK_KEYWORDS.some(k => receiverBank.includes(k));
-
-  if (senderHighRisk) risk += 0.25;
+  if (senderHighRisk)   risk += 0.25;
   if (receiverHighRisk) risk += 0.20;
 
-  // Cross-bank transfer (different banks = slightly higher risk)
-  if (senderBank !== receiverBank) risk += 0.1;
+  // ── Cross-bank transfer ──────────────────────────────────────────────────
+  if (senderBank !== receiverBank) risk += 0.10;
 
-  // Sender account has already elevated riskScore
-  if (senderAccount?.riskScore > 0.5) risk += 0.2;
+  // ── City-tier risk (RBI classification) ─────────────────────────────────
+  if (originCity) {
+    if (TIER3_CITIES.has(originCity)) {
+      risk += 0.20; // Known high-risk low-density city
+    } else if (!TIER1_CITIES.has(originCity)) {
+      risk += 0.08; // Unknown Tier-2 — mild boost
+    }
+  }
+
+  // ── Receiver UPI PSP risk ────────────────────────────────────────────────
+  const receiverPsp = (transaction?.upiVpaReceiver || "").split("@")[1]?.toLowerCase();
+  if (receiverPsp && HIGH_RISK_PSPS.has(receiverPsp)) risk += 0.12;
+
+  // ── Sender account-level risk cascade ───────────────────────────────────
+  if (senderAccount?.riskScore > 0.5) risk += 0.20;
 
   return Math.min(1, risk);
 }

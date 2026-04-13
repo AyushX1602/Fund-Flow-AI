@@ -66,6 +66,7 @@ async function getFraudTrend(req, res, next) {
       where: { timestamp: { gte: startDate } },
       select: { timestamp: true, isFraud: true, fraudScore: true },
       orderBy: { timestamp: "asc" },
+      take: 10000,                         // guard: timestamp index handles this efficiently
     });
 
     // Group by day
@@ -111,6 +112,8 @@ async function getRiskDistribution(req, res, next) {
     const transactions = await prisma.transaction.findMany({
       where: { fraudScore: { not: null } },
       select: { fraudScore: true },
+      take: 5000,                          // cap — indexes on fraudScore handle this fast
+      orderBy: { timestamp: "desc" },     // most recent 5K for representative sample
     });
 
     const buckets = {

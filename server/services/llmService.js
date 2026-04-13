@@ -205,7 +205,7 @@ function parseGeminiResponse(text) {
       reasoning:  parsed.reasoning  || "LLM analysis inconclusive.",
       flags:      Array.isArray(parsed.flags) ? parsed.flags.slice(0, 3) : [],
       fromCache:  false,
-      model:      "gemini-1.5-flash",
+      model:      "gemini-2.0-flash",
     };
   } catch {
     // If Gemini returns unstructured text, extract what we can
@@ -215,7 +215,7 @@ function parseGeminiResponse(text) {
       reasoning:  text.slice(0, 300),
       flags:      [],
       fromCache:  false,
-      model:      "gemini-1.5-flash",
+      model:      "gemini-2.0-flash",
     };
   }
 }

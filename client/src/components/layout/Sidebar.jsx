@@ -3,7 +3,7 @@ import { NavLink, useNavigate } from "react-router-dom"
 import {
   LayoutDashboard, ArrowLeftRight, ShieldAlert, Network,
   Users, FileSearch, Brain, Sun, Moon, LogOut, Settings,
-  ChevronDown, Activity,
+  ChevronDown, Activity, FlaskConical,
 } from "lucide-react"
 import { motion, AnimatePresence } from "framer-motion"
 import { ScrollArea } from "@/components/ui/scroll-area"
@@ -22,6 +22,7 @@ const navItems = [
   { to: "/accounts",       icon: Users,           label: "Accounts"                   },
   { to: "/investigations", icon: FileSearch,      label: "Investigations"             },
   { to: "/model",          icon: Brain,           label: "ML Model"                   },
+  { to: "/analyze",        icon: FlaskConical,    label: "Analyze"                    },
 ]
 
 // ─── Sidebar variants (Framer Motion) ─────────────────────────────────────
