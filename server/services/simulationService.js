@@ -97,31 +97,31 @@ function generateFraudTransaction(accounts) {
   switch (fraudPattern) {
     case "high_value":
       base.amount = randomAmount(500000, 2000000);
-      base.description = "Suspicious high-value transfer";
+      base.description = randomPick(["Investment returns", "Forex profit", "Business settlement", "Loan processing fee"]);
       break;
 
     case "structuring":
       // Amount just under reporting threshold
       base.amount = randomAmount(45000, 49999);
       base.type = "UPI";
-      base.description = "Possible structuring — near ₹50K threshold";
+      base.description = randomPick(["Monthly rent", "Prize money transfer", "Urgent help needed"]);
       break;
 
     case "rapid_fire":
       base.amount = randomAmount(5000, 15000);
-      base.description = "Part of rapid-fire transaction burst";
+      base.description = randomPick(["Game recharge", "Advance for job", "OTP charges refund", "KYC update"]);
       break;
 
     case "new_account_large":
       base.amount = randomAmount(100000, 500000);
       base.type = "NEFT";
-      base.description = "Large transfer from new account";
+      base.description = randomPick(["Property advance", "Lottery award money", "Forex return"]);
       break;
 
     case "mule_transfer":
       base.amount = randomAmount(20000, 80000);
       base.type = "IMPS";
-      base.description = "Suspected mule account transfer";
+      base.description = randomPick(["Salary", "Refund", "Wallet transfer", "Urgent medical"]);
       break;
   }
 

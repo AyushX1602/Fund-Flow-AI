@@ -255,6 +255,25 @@ function ruleBasedScore(transaction, senderAccount, receiverAccount) {
     });
   }
 
+  // ── Scam Keywords in Remarks ──
+  const SCAM_KEYWORDS = [
+    "prize", "lottery", "investment return", "forex profit",
+    "job advance", "loan", "otp", "urgent help",
+    "award money", "kyc update"
+  ];
+  
+  const desc = (transaction.description || "").toLowerCase();
+  const hasScamKeyword = SCAM_KEYWORDS.some(k => desc.includes(k));
+  if (hasScamKeyword) {
+    score += 0.35;
+    reasons.push({ 
+      feature: "scam_keyword", 
+      value: true,
+      impact: 0.35,
+      description: `Payment remark contains known scam phrase: "${transaction.description}"` 
+    });
+  }
+
   // Clamp score between 0 and 1
   const fraudScore = Math.min(1, Math.max(0, score));
   const isFraud = fraudScore >= config.alertThreshold;

@@ -1,6 +1,7 @@
 const prisma = require("../prismaClient");
 const mlService = require("./mlService");
 const riskEngine = require("./riskEngine");
+const llmService = require("./llmService");
 const { createAuditLog } = require("./auditService");
 const { generateTransactionId, parseUpiVpa } = require("../utils/helpers");
 const { AUDIT_ACTIONS, SOCKET_EVENTS } = require("../utils/constants");
@@ -139,24 +140,32 @@ async function processTransaction(data, userId = null) {
   const riskProfile = await riskEngine.computeRiskLayers(scoredTransaction, senderAccount, receiverAccount);
   logger.info(`Risk layers for ${scoredTransaction.transactionId}: composite=${riskProfile.compositeScore} dominant=${riskProfile.dominantLayer}`);
 
+  // ── Brain 3: Gemini LLM (only for uncertain zone 0.35-0.75) ────────────
+  const effectiveScore = Math.max(mlResult.fraudScore, riskProfile.compositeScore);
+  const llmAnalysis = await llmService.analyseTransaction(
+    scoredTransaction, senderAccount, mlResult, riskProfile
+  );
+  if (llmAnalysis) {
+    logger.info(`Gemini verdict for ${scoredTransaction.transactionId}: ${llmAnalysis.verdict} (confidence: ${llmAnalysis.confidence})`);
+  }
+
   // Auto-generate alert if fraud score OR composite score exceeds threshold
   let alert = null;
-  const effectiveScore = Math.max(mlResult.fraudScore, riskProfile.compositeScore);
   if (mlResult.isFraud || effectiveScore >= config.alertThreshold) {
-    alert = await createAlertForTransaction(scoredTransaction, mlResult, riskProfile);
+    alert = await createAlertForTransaction(scoredTransaction, mlResult, riskProfile, llmAnalysis);
   }
 
   // Update account risk scores
   await updateAccountRiskScores(senderAccount.id);
   await updateAccountRiskScores(receiverAccount.id);
 
-  return { transaction: scoredTransaction, mlResult, riskProfile, alert };
+  return { transaction: scoredTransaction, mlResult, riskProfile, llmAnalysis, alert };
 }
 
 /**
  * Create an alert for a flagged transaction.
  */
-async function createAlertForTransaction(transaction, mlResult, riskProfile = null) {
+async function createAlertForTransaction(transaction, mlResult, riskProfile = null, llmAnalysis = null) {
   // Use the higher of ML score or composite score — whichever triggered the alert
   const effectiveScore = riskProfile
     ? Math.max(mlResult.fraudScore, riskProfile.compositeScore)
@@ -177,7 +186,7 @@ async function createAlertForTransaction(transaction, mlResult, riskProfile = nu
         severity,
         transactionId: transaction.id,
         description: buildAlertDescription(transaction, mlResult, riskProfile),
-        riskScore: effectiveScore,      // ← effective score, not just ML
+        riskScore: effectiveScore,
         mlReasons: {
           reasons:        mlResult.reasons,
           mlScore:        mlResult.fraudScore,
@@ -185,6 +194,14 @@ async function createAlertForTransaction(transaction, mlResult, riskProfile = nu
           layers:         riskProfile?.layers ?? null,
           dominantLayer:  riskProfile?.dominantLayer ?? null,
           triggeredBy,
+          // Brain 3: Gemini LLM output (null if score was out of uncertain zone)
+          llm: llmAnalysis ? {
+            verdict:    llmAnalysis.verdict,
+            confidence: llmAnalysis.confidence,
+            reasoning:  llmAnalysis.reasoning,
+            flags:      llmAnalysis.flags,
+            fromCache:  llmAnalysis.fromCache,
+          } : null,
         },
       },
     });

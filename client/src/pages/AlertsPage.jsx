@@ -40,13 +40,14 @@ function AlertDetail({ alert, onClose }) {
   if (!alert) return null;
 
   // Pull both scores from the enriched mlReasons object
-  const mlReasons   = alert.mlReasons   || {};
-  const mlScore     = mlReasons.mlScore  ?? alert.transaction?.fraudScore ?? null;
-  const composite   = mlReasons.compositeScore ?? null;
-  const layers      = mlReasons.layers   ?? null;
+  const mlReasons     = alert.mlReasons   || {};
+  const mlScore       = mlReasons.mlScore  ?? alert.transaction?.fraudScore ?? null;
+  const composite     = mlReasons.compositeScore ?? null;
+  const layers        = mlReasons.layers   ?? null;
   const dominantLayer = mlReasons.dominantLayer ?? null;
-  const triggeredBy = mlReasons.triggeredBy ?? null;
+  const triggeredBy   = mlReasons.triggeredBy ?? null;
   const effectiveScore = alert.riskScore ?? mlScore;
+  const llm           = mlReasons.llm ?? null;  // Gemini Brain 3 output
 
   const reasons = explanation?.reasons
     || explanation?.explanation?.reasons
@@ -156,6 +157,35 @@ function AlertDetail({ alert, onClose }) {
                     );
                   })}
                 </div>
+              </div>
+            )}
+
+            {/* ── Gemini LLM Panel (only when available) ────── */}
+            {llm && (
+              <div className="rounded-lg border bg-gradient-to-br from-violet-50 to-blue-50 dark:from-violet-950/20 dark:to-blue-950/20 p-3 space-y-2">
+                <div className="flex items-center justify-between">
+                  <p className="text-xs font-semibold text-violet-700 dark:text-violet-400 uppercase tracking-wider flex items-center gap-1.5">
+                    ✨ Gemini AI Analysis
+                    {llm.fromCache && <span className="text-[9px] bg-violet-100 text-violet-600 px-1 rounded">cached</span>}
+                  </p>
+                  <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${
+                    llm.verdict === 'SUSPICIOUS' ? 'bg-red-100 text-red-700' :
+                    llm.verdict === 'MONITOR'    ? 'bg-amber-100 text-amber-700' :
+                                                   'bg-emerald-100 text-emerald-700'
+                  }`}>
+                    {llm.verdict} · {(llm.confidence * 100).toFixed(0)}%
+                  </span>
+                </div>
+                <p className="text-xs text-muted-foreground leading-relaxed">{llm.reasoning}</p>
+                {llm.flags && llm.flags.length > 0 && (
+                  <div className="flex flex-wrap gap-1 pt-1">
+                    {llm.flags.map((f, i) => (
+                      <span key={i} className="text-[10px] bg-white dark:bg-slate-800 border border-violet-200 dark:border-violet-800 text-violet-700 dark:text-violet-300 px-2 py-0.5 rounded-full">
+                        {f}
+                      </span>
+                    ))}
+                  </div>
+                )}
               </div>
             )}
 
