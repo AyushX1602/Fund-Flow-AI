@@ -1,5 +1,7 @@
 const prisma = require("../prismaClient");
 const mlService = require("../services/mlService");
+const llmService = require("../services/llmService");
+const riskEngine = require("../services/riskEngine");
 const ApiError = require("../utils/ApiError");
 const ApiResponse = require("../utils/ApiResponse");
 
@@ -145,4 +147,79 @@ async function explain(req, res, next) {
   }
 }
 
-module.exports = { score, batchScore, getModelInfo, explain };
+/**
+ * POST /api/ml/gemini-analyse/:transactionId
+ * On-demand Gemini analysis for the investigation review queue.
+ * Bypasses score gating — investigator explicitly requested it.
+ */
+async function geminiAnalyse(req, res, next) {
+  try {
+    const transaction = await prisma.transaction.findUnique({
+      where: { id: req.params.transactionId },
+      include: { senderAccount: true, receiverAccount: true },
+    });
+
+    if (!transaction) throw ApiError.notFound("Transaction not found");
+
+    // Build ML result from existing data
+    const mlResult = {
+      fraudScore: transaction.fraudScore || 0,
+      reasons: Array.isArray(transaction.mlReasons) ? transaction.mlReasons
+        : (transaction.mlReasons?.reasons || []),
+    };
+
+    // Compute risk profile
+    const riskProfile = await riskEngine.computeRiskLayers(
+      transaction, transaction.senderAccount, transaction.receiverAccount
+    );
+
+    // Force Gemini analysis (bypasses score gate)
+    const llmResult = await llmService.forceAnalyse(
+      transaction, transaction.senderAccount, mlResult, riskProfile
+    );
+
+    if (!llmResult) {
+      throw ApiError.badRequest("Gemini analysis unavailable — check API key or quota");
+    }
+
+    // Save the LLM result back to the alert's mlReasons if an alert exists
+    const alert = await prisma.alert.findFirst({
+      where: { transactionId: transaction.id },
+      select: { id: true, mlReasons: true },
+    });
+    if (alert) {
+      const existingReasons = (typeof alert.mlReasons === "object" && alert.mlReasons) || {};
+      await prisma.alert.update({
+        where: { id: alert.id },
+        data: {
+          mlReasons: {
+            ...existingReasons,
+            llm: {
+              verdict: llmResult.verdict,
+              confidence: llmResult.confidence,
+              reasoning: llmResult.reasoning,
+              flags: llmResult.flags,
+              fromCache: llmResult.fromCache || false,
+              model: llmResult.model,
+              requestedBy: "investigator",
+            },
+          },
+        },
+      });
+    }
+
+    ApiResponse.success({
+      transactionId: transaction.transactionId,
+      llm: llmResult,
+      riskProfile: {
+        compositeScore: riskProfile.compositeScore,
+        layers: riskProfile.layers,
+        dominantLayer: riskProfile.dominantLayer,
+      },
+    }, "Gemini analysis complete").send(res);
+  } catch (error) {
+    next(error);
+  }
+}
+
+module.exports = { score, batchScore, getModelInfo, explain, geminiAnalyse };

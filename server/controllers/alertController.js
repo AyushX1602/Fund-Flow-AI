@@ -29,7 +29,7 @@ async function list(req, res, next) {
         include: {
           transaction: {
             select: {
-              transactionId: true, amount: true, type: true, channel: true, timestamp: true, fraudScore: true,
+              id: true, transactionId: true, amount: true, type: true, channel: true, timestamp: true, fraudScore: true, description: true,
               senderAccount: { select: { id: true, accountNumber: true, accountHolder: true, bankName: true } },
               receiverAccount: { select: { id: true, accountNumber: true, accountHolder: true, bankName: true } },
             },

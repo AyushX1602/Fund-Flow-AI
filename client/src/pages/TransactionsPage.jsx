@@ -195,6 +195,7 @@ export default function TransactionsPage() {
                     <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground">Amount</th>
                     <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground">Type</th>
                     <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground">Sender → Receiver</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground">Remarks</th>
                     <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground">Time</th>
                     <th className="px-4 py-3 text-right text-xs font-medium text-muted-foreground">Score</th>
                   </tr>
@@ -203,12 +204,12 @@ export default function TransactionsPage() {
                   {loading ? (
                     Array.from({ length: 8 }).map((_, i) => (
                       <tr key={i} className="border-b border-border/50">
-                        <td colSpan={6} className="px-4 py-3"><Skeleton className="h-4 w-full" /></td>
+                        <td colSpan={7} className="px-4 py-3"><Skeleton className="h-4 w-full" /></td>
                       </tr>
                     ))
                   ) : filteredTxns.length === 0 ? (
                     <tr>
-                      <td colSpan={6} className="px-4 py-8 text-center text-muted-foreground">No transactions found</td>
+                      <td colSpan={7} className="px-4 py-8 text-center text-muted-foreground">No transactions found</td>
                     </tr>
                   ) : (
                     filteredTxns.map((txn) => (
@@ -223,6 +224,7 @@ export default function TransactionsPage() {
                         <td className="px-4 py-3 text-xs truncate max-w-[200px]">
                           {txn.senderAccount?.accountHolder || "—"} → {txn.receiverAccount?.accountHolder || "—"}
                         </td>
+                        <td className="px-4 py-3 text-xs text-muted-foreground/70 italic truncate max-w-[140px]" title={txn.description}>{txn.description || "—"}</td>
                         <td className="px-4 py-3 text-xs text-muted-foreground">{formatDateTime(txn.timestamp)}</td>
                         <td className={`px-4 py-3 text-right font-mono-data font-semibold ${getRiskColor(txn.fraudScore)}`}>
                           {formatScore(txn.fraudScore)}

@@ -279,12 +279,13 @@ export default function NetworkPage() {
       ctx.textBaseline = "alphabetic";
 
       // Name label below node
+      const isDarkMode = document.documentElement.classList.contains("dark");
       ctx.font = "600 11px 'Geist Variable', sans-serif";
-      ctx.fillStyle = "#1e1e2e";
+      ctx.fillStyle = isDarkMode ? "#e2e8f0" : "#1e1e2e";
       ctx.textAlign = "center";
       ctx.fillText(n.accountHolder || n.accountNumber || "", n.x, n.y + r + 14);
       ctx.font = "10px 'Geist Variable', sans-serif";
-      ctx.fillStyle = "#888";
+      ctx.fillStyle = isDarkMode ? "#94a3b8" : "#888";
       ctx.fillText(n.bankName || "", n.x, n.y + r + 26);
     });
 

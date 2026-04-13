@@ -88,6 +88,12 @@ function AlertDetail({ alert, onClose }) {
                 <p className="text-xs text-muted-foreground">Created</p>
                 <p>{formatRelativeTime(alert.createdAt)}</p>
               </div>
+              {alert.transaction?.description && (
+                <div className="col-span-2">
+                  <p className="text-xs text-muted-foreground">Payment Remarks</p>
+                  <p className="text-sm italic text-foreground/80">"{alert.transaction.description}"</p>
+                </div>
+              )}
             </div>
 
             {/* ── Dual brain scores ──────────────────── */}

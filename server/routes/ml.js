@@ -23,5 +23,6 @@ router.post("/score", authenticate, validate(scoreSchema), mlController.score);
 router.post("/batch-score", authenticate, validate(batchScoreSchema), mlController.batchScore);
 router.get("/model-info", authenticate, mlController.getModelInfo);
 router.post("/explain/:transactionId", authenticate, mlController.explain);
+router.post("/gemini-analyse/:transactionId", authenticate, mlController.geminiAnalyse);
 
 module.exports = router;

@@ -226,6 +226,89 @@ function parseGeminiResponse(text) {
 }
 
 /**
+ * Force-analyse a transaction with Gemini (bypass score gating).
+ * Used by the Investigation review queue for on-demand human-triggered analysis.
+ * Still respects daily quota and rate limits.
+ *
+ * @param {Object} transaction   - Full transaction from DB (with accounts)
+ * @param {Object} senderAccount
+ * @param {Object} mlResult      - { fraudScore, reasons[] }
+ * @param {Object} riskProfile   - { compositeScore, layers, dominantLayer }
+ * @returns {Object|null}
+ */
+async function forceAnalyse(transaction, senderAccount, mlResult, riskProfile) {
+  // ── Gate: Daily quota guard ────────────────────────────────────────────
+  if (Date.now() > dailyResetAt) {
+    dailyCallCount = 0;
+    dailyResetAt = getNextMidnight();
+  }
+  if (dailyCallCount >= MAX_DAILY) {
+    logger.warn(`Gemini daily cap (${MAX_DAILY}) reached — skipping forced analysis`);
+    return { verdict: "QUOTA_EXHAUSTED", confidence: 0, reasoning: `Gemini daily quota (${MAX_DAILY} calls) exhausted. Resets at midnight.`, flags: [], model: "gemini-2.0-flash" };
+  }
+
+  // ── Cache check ────────────────────────────────────────────────────────
+  const cacheKey = `force_${transaction.id}`;
+  const cached = analysisCache.get(cacheKey);
+  if (cached && cached.expiresAt > Date.now()) {
+    return { ...cached.result, fromCache: true };
+  }
+
+  // ── Model available ────────────────────────────────────────────────────
+  const llmModel = getModel();
+  if (!llmModel) {
+    return { verdict: "UNAVAILABLE", confidence: 0, reasoning: "Gemini API key not configured. Add GEMINI_API_KEY to .env.", flags: [], model: "gemini-2.0-flash" };
+  }
+
+  // ── Rate limit ─────────────────────────────────────────────────────────
+  const now = Date.now();
+  const waitMs = Math.max(0, MIN_GAP_MS - (now - lastCallTime));
+  if (waitMs > 0) {
+    await new Promise(r => setTimeout(r, waitMs));
+  }
+  lastCallTime = Date.now();
+
+  const effectiveScore = riskProfile
+    ? Math.max(mlResult.fraudScore, riskProfile.compositeScore)
+    : mlResult.fraudScore;
+
+  const prompt = buildPrompt(transaction, senderAccount, mlResult, riskProfile, effectiveScore);
+
+  try {
+    logger.info(`Gemini FORCED analysis for txn ${transaction.transactionId} (score: ${effectiveScore}, daily: ${dailyCallCount + 1}/${MAX_DAILY})`);
+    dailyCallCount++;
+
+    const result = await Promise.race([
+      llmModel.generateContent(prompt),
+      new Promise((_, reject) =>
+        setTimeout(() => reject(new Error("LLM timeout")), CALL_TIMEOUT)
+      ),
+    ]);
+
+    const text = result.response.text();
+    const parsed = parseGeminiResponse(text);
+
+    // Cache by transaction ID
+    analysisCache.set(cacheKey, {
+      result: parsed,
+      expiresAt: Date.now() + CACHE_TTL_MS,
+    });
+
+    return parsed;
+  } catch (err) {
+    if (err.message === "LLM timeout") {
+      logger.warn(`Gemini timeout for forced analysis txn ${transaction.transactionId}`);
+      return { verdict: "TIMEOUT", confidence: 0, reasoning: "Gemini API timed out after 20 seconds. Try again.", flags: [], model: "gemini-2.0-flash" };
+    } else if (err.message?.includes("429") || err.message?.includes("quota")) {
+      logger.warn("Gemini rate limit on forced analysis");
+      return { verdict: "RATE_LIMITED", confidence: 0, reasoning: "Gemini API rate limit hit (free tier: ~15 RPM). Wait 60 seconds.", flags: [], model: "gemini-2.0-flash" };
+    }
+    logger.error("Gemini forced analysis error", { error: err.message });
+    return { verdict: "ERROR", confidence: 0, reasoning: err.message || "Unknown error", flags: [], model: "gemini-2.0-flash" };
+  }
+}
+
+/**
  * Check if LLM service is configured and available.
  */
 function isLLMAvailable() {
@@ -240,4 +323,5 @@ function clearCache() {
   analysisCache.clear();
 }
 
-module.exports = { analyseTransaction, isLLMAvailable, clearCache };
+module.exports = { analyseTransaction, forceAnalyse, isLLMAvailable, clearCache };
+
