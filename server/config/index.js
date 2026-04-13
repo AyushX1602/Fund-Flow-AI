@@ -6,7 +6,12 @@ module.exports = {
   databaseUrl: process.env.DATABASE_URL,
 
   jwt: {
-    secret: process.env.JWT_SECRET || "fundflow-ai-dev-secret-change-in-production",
+    secret: process.env.JWT_SECRET || (() => {
+      if (process.env.NODE_ENV === "production") {
+        throw new Error("FATAL: JWT_SECRET must be set in production environment");
+      }
+      return "fundflow-ai-dev-secret-change-in-production";
+    })(),
     expiresIn: process.env.JWT_EXPIRES_IN || "7d",
   },
 

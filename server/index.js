@@ -8,6 +8,8 @@ const dotenv = require("dotenv");
 
 dotenv.config();
 
+const prisma = require("./prismaClient");
+
 const config = require("./config");
 const logger = require("./utils/logger");
 const errorHandler = require("./middleware/errorHandler");
@@ -75,15 +77,23 @@ app.use(
 // ─────────────────────────────────────────────
 // Health Check
 // ─────────────────────────────────────────────
-app.get("/api/health", (req, res) => {
+app.get("/api/health", async (req, res) => {
+  let dbStatus = "disconnected";
+  try {
+    await prisma.$queryRaw`SELECT 1`;
+    dbStatus = "connected";
+  } catch {
+    dbStatus = "disconnected";
+  }
+
   res.json({
     success: true,
     message: "FundFlow AI server is running",
     timestamp: new Date().toISOString(),
     version: "1.0.0",
     services: {
-      database: "connected",
-      socketio: io.engine.clientsCount >= 0 ? "active" : "inactive",
+      database: dbStatus,
+      socketio: io.engine.clientsCount > 0 ? "active" : "idle",
     },
   });
 });
@@ -131,9 +141,10 @@ server.listen(config.port, () => {
 // Graceful shutdown
 process.on("SIGTERM", async () => {
   logger.info("SIGTERM received. Shutting down gracefully...");
-  const prisma = require("./prismaClient");
   await prisma.$disconnect();
   server.close(() => process.exit(0));
 });
 
 module.exports = { app, server, io };
+
+// nodemon trigger

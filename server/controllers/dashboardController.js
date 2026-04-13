@@ -8,43 +8,47 @@ const ApiResponse = require("../utils/ApiResponse");
  */
 async function getOverview(req, res, next) {
   try {
-    const result = await prisma.$transaction(async (tx) => {
-      const [
-        totalTransactions,
-        fraudCount,
-        totalAlerts,
-        unresolvedAlerts,
-        totalAccounts,
-        frozenAccounts,
-        totalAmount,
-        todayTxnCount,
-      ] = await Promise.all([
-        tx.transaction.count(),
-        tx.transaction.count({ where: { isFraud: true } }),
-        tx.alert.count(),
-        tx.alert.count({ where: { status: { in: ["NEW", "REVIEWING", "ESCALATED"] } } }),
-        tx.account.count(),
-        tx.account.count({ where: { isFrozen: true } }),
-        tx.transaction.aggregate({ _sum: { amount: true } }),
-        tx.transaction.count({
-          where: {
-            timestamp: { gte: new Date(new Date().setHours(0, 0, 0, 0)) },
-          },
-        }),
-      ]);
+    // Sequential batches to avoid exhausting Neon's connection pool.
+    // Read-only counts don't need transactional isolation.
+    const [
+      totalTransactions,
+      fraudCount,
+      totalAlerts,
+      unresolvedAlerts,
+    ] = await Promise.all([
+      prisma.transaction.count(),
+      prisma.transaction.count({ where: { isFraud: true } }),
+      prisma.alert.count(),
+      prisma.alert.count({ where: { status: { in: ["NEW", "REVIEWING", "ESCALATED"] } } }),
+    ]);
 
-      return {
-        totalTransactions,
-        fraudCount,
-        fraudRate: totalTransactions > 0 ? ((fraudCount / totalTransactions) * 100).toFixed(2) : "0.00",
-        totalAlerts,
-        unresolvedAlerts,
-        totalAccounts,
-        frozenAccounts,
-        totalVolume: totalAmount._sum.amount || 0,
-        todayTxnCount,
-      };
-    }, { timeout: 15000 });
+    const [
+      totalAccounts,
+      frozenAccounts,
+      totalAmount,
+      todayTxnCount,
+    ] = await Promise.all([
+      prisma.account.count(),
+      prisma.account.count({ where: { isFrozen: true } }),
+      prisma.transaction.aggregate({ _sum: { amount: true } }),
+      prisma.transaction.count({
+        where: {
+          timestamp: { gte: new Date(new Date().setHours(0, 0, 0, 0)) },
+        },
+      }),
+    ]);
+
+    const result = {
+      totalTransactions,
+      fraudCount,
+      fraudRate: totalTransactions > 0 ? ((fraudCount / totalTransactions) * 100).toFixed(2) : "0.00",
+      totalAlerts,
+      unresolvedAlerts,
+      totalAccounts,
+      frozenAccounts,
+      totalVolume: totalAmount._sum.amount || 0,
+      todayTxnCount,
+    };
 
     ApiResponse.success(result).send(res);
   } catch (error) {
@@ -220,7 +224,7 @@ async function getChannelBreakdown(req, res, next) {
       channel: b.channel,
       count: b._count,
       totalAmount: b._sum.amount || 0,
-      avgFraudScore: b._avg.fraudScore ? b._avg.fraudScore.toFixed(4) : null,
+      avgFraudScore: b._avg.fraudScore != null ? b._avg.fraudScore.toFixed(4) : null,
     }));
 
     ApiResponse.success(result).send(res);
@@ -237,50 +241,48 @@ async function getMuleNetwork(req, res, next) {
   try {
     const minMuleScore = parseFloat(req.query.minScore) || 0.3;
 
-    const result = await prisma.$transaction(async (tx) => {
-      const muleAccounts = await tx.account.findMany({
-        where: { muleScore: { gte: minMuleScore } },
-        orderBy: { muleScore: "desc" },
-        take: 20,
-        select: {
-          id: true,
-          accountNumber: true,
-          accountHolder: true,
-          bankName: true,
-          muleScore: true,
-          riskScore: true,
-          isFrozen: true,
-        },
-      });
+    const muleAccounts = await prisma.account.findMany({
+      where: { muleScore: { gte: minMuleScore } },
+      orderBy: { muleScore: "desc" },
+      take: 20,
+      select: {
+        id: true,
+        accountNumber: true,
+        accountHolder: true,
+        bankName: true,
+        muleScore: true,
+        riskScore: true,
+        isFrozen: true,
+      },
+    });
 
-      const muleIds = muleAccounts.map((a) => a.id);
+    const muleIds = muleAccounts.map((a) => a.id);
 
-      // Get edges connecting mule accounts
-      const edges = await tx.fundFlowEdge.findMany({
-        where: {
-          OR: [
-            { sourceAccountId: { in: muleIds } },
-            { targetAccountId: { in: muleIds } },
-          ],
-        },
-        select: {
-          id: true,
-          sourceAccountId: true,
-          targetAccountId: true,
-          amount: true,
-          timestamp: true,
-          riskScore: true,
-        },
-        orderBy: { timestamp: "desc" },
-        take: 100,
-      });
+    // Get edges connecting mule accounts
+    const edges = muleIds.length > 0 ? await prisma.fundFlowEdge.findMany({
+      where: {
+        OR: [
+          { sourceAccountId: { in: muleIds } },
+          { targetAccountId: { in: muleIds } },
+        ],
+      },
+      select: {
+        id: true,
+        sourceAccountId: true,
+        targetAccountId: true,
+        amount: true,
+        timestamp: true,
+        riskScore: true,
+      },
+      orderBy: { timestamp: "desc" },
+      take: 100,
+    }) : [];
 
-      return {
-        nodes: muleAccounts,
-        edges,
-        totalMuleAccounts: muleAccounts.length,
-      };
-    }, { timeout: 15000 });
+    const result = {
+      nodes: muleAccounts,
+      edges,
+      totalMuleAccounts: muleAccounts.length,
+    };
 
     ApiResponse.success(result).send(res);
   } catch (error) {

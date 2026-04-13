@@ -20,12 +20,12 @@ const prisma = require("../prismaClient");
 
 // ─── Channel base risk scores ─────────────────────────────────────────────
 const CHANNEL_RISK = {
-  CASH:        0.55, // Hard to trace, manual
-  UPI:         0.25, // Low friction, but traceable
-  NET_BANKING: 0.15, // Authenticated session
-  RTGS:        0.20, // High-value but bank-verified
-  NEFT:        0.18,
-  IMPS:        0.22,
+  MOBILE_APP:   0.25, // UPI via mobile — low friction but traceable
+  NET_BANKING:  0.15, // Authenticated session
+  ATM:          0.40, // Cash-based, harder to trace
+  BRANCH:       0.10, // In-person, verified
+  POS:          0.12, // Point of sale
+  API:          0.30, // Automated — could be bulk ops
 };
 
 // ─── Bank pairs that indicate cross-region / high-risk transfers ──────────

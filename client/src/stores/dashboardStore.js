@@ -1,7 +1,7 @@
 import { create } from "zustand";
 import api from "@/lib/api";
 
-const useDashboardStore = create((set) => ({
+const useDashboardStore = create((set, get) => ({
   overview: null,
   fraudTrend: [],
   riskDistribution: [],
@@ -9,6 +9,7 @@ const useDashboardStore = create((set) => ({
   topRiskAccounts: [],
   channelBreakdown: [],
   loading: true,
+  lastFetchedAt: 0,
 
   fetchOverview: async () => {
     try {
@@ -64,7 +65,12 @@ const useDashboardStore = create((set) => ({
     }
   },
 
-  fetchAll: async () => {
+  fetchAll: async (force = false) => {
+    // Skip if data was fetched less than 30s ago (avoid redundant calls on fast navigation)
+    const { lastFetchedAt } = get();
+    if (!force && lastFetchedAt && Date.now() - lastFetchedAt < 30000) {
+      return;
+    }
     set({ loading: true });
     const store = useDashboardStore.getState();
     // Batch 1: core data (overview uses $transaction internally, so safe)
@@ -79,7 +85,7 @@ const useDashboardStore = create((set) => ({
       store.fetchTopRiskAccounts(),
       store.fetchChannelBreakdown(),
     ]);
-    set({ loading: false });
+    set({ loading: false, lastFetchedAt: Date.now() });
   },
 
   incrementUnresolved: () => {

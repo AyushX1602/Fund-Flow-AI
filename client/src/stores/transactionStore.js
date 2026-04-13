@@ -41,7 +41,7 @@ const useTransactionStore = create((set, get) => ({
   updateScore: (data) => {
     set((state) => ({
       liveTransactions: state.liveTransactions.map((t) =>
-        t.id === data.transactionId
+        t.id === data.id
           ? { ...t, fraudScore: data.fraudScore, isFraud: data.isFraud }
           : t
       ),

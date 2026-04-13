@@ -2,7 +2,12 @@
 FundFlow AI — Single Entry Point
 Run the entire application from here.
 """
+import sys
+import os
 import uvicorn
+
+# Ensure config module is importable regardless of CWD
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from config import API_HOST, API_PORT
 
 

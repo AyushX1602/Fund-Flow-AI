@@ -99,6 +99,7 @@ model User {
 
   assignedAlerts Alert[]         @relation("AssignedTo")
   createdCases   Investigation[] @relation("CreatedBy")
+  authoredNotes  CaseNote[]      @relation("NoteAuthor")
   auditLogs      AuditLog[]
 
   @@index([role])
@@ -277,6 +278,7 @@ model CaseNote {
   investigationId String
   investigation   Investigation @relation(fields: [investigationId], references: [id], onDelete: Cascade)
   authorId        String
+  author          User          @relation("NoteAuthor", fields: [authorId], references: [id])
   createdAt       DateTime      @default(now())
 }
 

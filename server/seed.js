@@ -140,10 +140,10 @@ async function main() {
 
   console.log("\n🎉 Seeding complete!");
   console.log("\n📋 Demo credentials:");
-  console.log("   Admin:      admin@fundflow.ai / admin123");
-  console.log("   Analyst:    analyst@fundflow.ai / admin123");
-  console.log("   Supervisor: supervisor@fundflow.ai / admin123");
-  console.log("\n💡 Or use X-Demo-Mode: true header to bypass auth\n");
+  console.log("   Admin:      admin@fundflow.ai / [see seed script]");
+  console.log("   Analyst:    analyst@fundflow.ai / [see seed script]");
+  console.log("   Supervisor: supervisor@fundflow.ai / [see seed script]");
+  console.log("\n💡 Or enable DEMO_MODE=true in .env to bypass auth\n");
 }
 
 main()

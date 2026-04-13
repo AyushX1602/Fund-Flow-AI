@@ -206,7 +206,7 @@ async function getStats(req, res, next) {
       fraudCount,
       fraudRate: total > 0 ? (fraudCount / total * 100).toFixed(2) + "%" : "0%",
       totalAmount: totalAmount._sum.amount || 0,
-      avgFraudScore: avgFraudScore._avg.fraudScore ? avgFraudScore._avg.fraudScore.toFixed(4) : null,
+      avgFraudScore: avgFraudScore._avg.fraudScore != null ? avgFraudScore._avg.fraudScore.toFixed(4) : null,
       byType,
       byChannel,
       simulationStatus: getSimulationStatus(),

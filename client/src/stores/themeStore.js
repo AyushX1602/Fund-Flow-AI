@@ -1,7 +1,7 @@
 import { create } from "zustand";
 
 const useThemeStore = create((set) => ({
-  theme: localStorage.getItem("fundflow-theme") || "light",
+  theme: (typeof window !== "undefined" && localStorage.getItem("fundflow-theme")) || "light",
   toggleTheme: () =>
     set((state) => {
       const next = state.theme === "light" ? "dark" : "light";

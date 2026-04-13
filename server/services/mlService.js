@@ -233,6 +233,16 @@ function ruleBasedScore(transaction, senderAccount, receiverAccount) {
   }
 
   // ── Frozen account check ──
+  if (senderAccount.isFrozen) {
+    score += 0.4;
+    reasons.push({
+      feature: "sender_frozen",
+      value: true,
+      impact: 0.4,
+      description: "Sender account is frozen — transaction from flagged account",
+    });
+  }
+
   if (receiverAccount.isFrozen) {
     score += 0.3;
     reasons.push({

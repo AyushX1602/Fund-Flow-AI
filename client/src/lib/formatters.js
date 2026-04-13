@@ -21,10 +21,10 @@ export function formatINRCompact(amount) {
   return `₹${Math.round(amount).toLocaleString("en-IN")}`;  // safe: no float artifacts
 }
 
-/** Format fraud score as a percentage string with color hint */
+/** Format fraud score as a decimal string (0.00-1.00) */
 export function formatScore(score) {
   if (score == null) return "—";
-  return (score * 1).toFixed(2);
+  return Number(score).toFixed(2);
 }
 
 /** Get severity badge variant */
@@ -85,14 +85,12 @@ export function truncate(str, maxLen = 20) {
 /** Map alert type to human-readable name */
 export function getAlertTypeName(type) {
   const names = {
-    HIGH_VALUE: "High Value",
-    VELOCITY: "Velocity",
-    MULE_ACCOUNT: "Mule Account",
-    STRUCTURING: "Structuring",
+    FRAUD_DETECTED: "Fraud Detected",
     SUSPICIOUS_PATTERN: "Suspicious Pattern",
-    KYC_RISK: "KYC Risk",
-    UNUSUAL_HOUR: "Unusual Hour",
-    CROSS_BORDER: "Cross Border",
+    HIGH_VALUE: "High Value",
+    VELOCITY_BREACH: "Velocity Breach",
+    MULE_ACCOUNT: "Mule Account",
+    RING_DETECTED: "Ring Detected",
   };
   return names[type] || type;
 }

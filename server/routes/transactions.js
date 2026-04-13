@@ -43,7 +43,13 @@ router.get("/", authenticate, transactionController.list);
 router.get("/stats", authenticate, transactionController.getStats);
 router.get("/:id", authenticate, transactionController.getById);
 router.post("/", authenticate, validate(createSchema), transactionController.create);
-router.post("/bulk", authenticate, transactionController.bulkCreate);
+
+const bulkSchema = {
+  body: Joi.object({
+    transactions: Joi.array().items(createSchema.body).min(1).max(100).required(),
+  }),
+};
+router.post("/bulk", authenticate, validate(bulkSchema), transactionController.bulkCreate);
 router.post("/simulate", authenticate, authorize("SUPERVISOR", "ADMIN"), validate(simulateSchema), transactionController.simulate);
 router.post("/simulate/stop", authenticate, authorize("SUPERVISOR", "ADMIN"), transactionController.stopSim);
 

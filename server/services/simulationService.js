@@ -52,8 +52,13 @@ function weightedPick(items, valueKey = "type") {
 function generateNormalTransaction(accounts) {
   const sender = randomPick(accounts);
   let receiver = randomPick(accounts);
-  while (receiver.id === sender.id) {
+  let retries = 0;
+  while (receiver.id === sender.id && retries < 100) {
     receiver = randomPick(accounts);
+    retries++;
+  }
+  if (receiver.id === sender.id) {
+    throw new Error("Cannot generate transaction — insufficient unique accounts");
   }
 
   const type = weightedPick(TXN_TYPE_WEIGHTS);
@@ -176,6 +181,9 @@ async function startSimulation(simulationConfig = {}, userId = null) {
 
   // Process transactions at specified rate
   const interval = 1000 / rate;
+  let consecutiveFailures = 0;
+  const MAX_CONSECUTIVE_FAILURES = 5;
+
   simulationTimer = setInterval(async () => {
     // Guard against race condition — simulation may have been stopped
     const sim = activeSimulation;
@@ -195,6 +203,7 @@ async function startSimulation(simulationConfig = {}, userId = null) {
       // Re-check after async operation — simulation may have been stopped
       if (!activeSimulation) return;
 
+      consecutiveFailures = 0; // Reset on success
       activeSimulation.processed++;
       if (result.mlResult.isFraud) activeSimulation.fraudCount++;
       if (result.alert) activeSimulation.alertCount++;
@@ -218,7 +227,12 @@ async function startSimulation(simulationConfig = {}, userId = null) {
       }
     } catch (error) {
       if (activeSimulation) {
-        logger.error("Simulation transaction failed", { error: error.message });
+        consecutiveFailures++;
+        logger.error(`Simulation transaction failed (${consecutiveFailures}/${MAX_CONSECUTIVE_FAILURES})`, { error: error.message });
+        if (consecutiveFailures >= MAX_CONSECUTIVE_FAILURES) {
+          logger.error("Too many consecutive failures — stopping simulation");
+          await stopSimulation();
+        }
       }
     }
   }, interval);

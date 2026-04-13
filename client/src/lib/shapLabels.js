@@ -16,7 +16,9 @@ const SHAP_LABELS = {
   account_age:         "New Account Risk",
   vpa_age:             "UPI VPA Age Risk",
   unusual_hour:        "Unusual Transaction Hour (1-5 AM)",
-  frozen_receiver:     "Receiver Account Frozen",
+  receiver_frozen:     "Receiver Account Frozen",
+  sender_frozen:       "Sender Account Frozen",
+  scam_keyword:        "Scam Phrase Detected in Payment Remarks",
 
   // ── FastAPI ML features ──
   sender_txn_count_1h:       "Transaction Velocity (Last 1 Hour)",

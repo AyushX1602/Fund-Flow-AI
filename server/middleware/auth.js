@@ -20,8 +20,8 @@ const DEMO_USER = {
  */
 async function authenticate(req, res, next) {
   try {
-    // Demo mode bypass — judges should never see a login screen
-    if (req.headers["x-demo-mode"] === "true" || config.demo.enabled) {
+    // Demo mode — only in non-production, controlled by server config (NOT client headers)
+    if (config.demo.enabled && process.env.NODE_ENV !== "production") {
       req.user = DEMO_USER;
       return next();
     }

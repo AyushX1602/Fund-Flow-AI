@@ -39,10 +39,17 @@ function errorHandler(err, req, res, _next) {
 
   // Log server errors
   if (statusCode >= 500) {
+    // Sanitize sensitive fields from request body before logging
+    const sanitizedBody = req.body ? { ...req.body } : undefined;
+    if (sanitizedBody) {
+      delete sanitizedBody.password;
+      delete sanitizedBody.token;
+      delete sanitizedBody.secret;
+    }
     logger.error(`${statusCode} ${req.method} ${req.originalUrl}`, {
       error: message,
       stack: err.stack,
-      body: req.body,
+      body: sanitizedBody,
     });
   } else {
     logger.warn(`${statusCode} ${req.method} ${req.originalUrl}: ${message}`);

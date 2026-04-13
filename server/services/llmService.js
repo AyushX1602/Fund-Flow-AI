@@ -28,7 +28,12 @@ let genAI = null;
 let model = null;
 let lastCallTime = 0;
 let dailyCallCount = 0;
-let dailyResetAt = Date.now() + 24 * 60 * 60 * 1000;
+function getNextMidnight() {
+  const d = new Date();
+  d.setHours(24, 0, 0, 0);
+  return d.getTime();
+}
+let dailyResetAt = getNextMidnight();
 
 // In-memory cache: senderAccountId → { result, expiresAt }
 const analysisCache = new Map();
@@ -70,7 +75,7 @@ async function analyseTransaction(transaction, senderAccount, mlResult, riskProf
   // ── Gate 2: Daily quota guard ──────────────────────────────────────────
   if (Date.now() > dailyResetAt) {
     dailyCallCount = 0;
-    dailyResetAt = Date.now() + 24 * 60 * 60 * 1000;
+    dailyResetAt = getNextMidnight();
   }
   if (dailyCallCount >= MAX_DAILY) {
     logger.warn(`Gemini daily cap (${MAX_DAILY}) reached — skipping LLM analysis`);
