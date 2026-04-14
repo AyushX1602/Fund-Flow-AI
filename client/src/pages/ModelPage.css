@@ -465,17 +465,24 @@
   width: 100%;
 }
 
-/* Inner layout: chart left, legend right on desktop */
-.ml-model-page .ml-radar-content {
-  display: flex;
-  flex-direction: column;
-  gap: 24px;
+/* Split layout: chart left | rings right */
+.ml-model-page .ml-radar-split {
+  display: grid;
+  grid-template-columns: 1fr 340px;
+  gap: 16px;
+  align-items: center;
+}
+
+@media (max-width: 900px) {
+  .ml-model-page .ml-radar-split {
+    grid-template-columns: 1fr;
+  }
 }
 
 /* Chart responsive wrapper */
 .ml-model-page .ml-radar-chart-wrap {
   width: 100%;
-  height: 320px;
+  height: 360px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -485,13 +492,19 @@
   overflow: visible;
 }
 
-/* Legend strip */
-.ml-model-page .ml-radar-legend {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px 20px;
-  justify-content: center;
-  padding: 0 8px 4px;
+/* ── Score rings grid ── */
+.ml-model-page .ml-score-rings {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+  padding: 8px 4px 16px;
+}
+
+@media (max-width: 900px) {
+  .ml-model-page .ml-score-rings {
+    grid-template-columns: repeat(7, 1fr);
+    padding: 0 4px 8px;
+  }
 }
 
 .ml-model-page .ml-radar-legend-item {
