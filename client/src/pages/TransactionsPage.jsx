@@ -96,12 +96,12 @@ function TransactionDetail({ txn, onClose }) {
     <Dialog open={!!txn} onOpenChange={onClose}>
       <DialogContent className="max-w-lg">
         <DialogHeader>
-          <div className="flex items-center justify-between pr-4">
-            <DialogTitle className="flex items-center gap-2">
+          <div className="flex items-center justify-between pr-10">
+            <DialogTitle className="flex flex-col items-start gap-1 sm:flex-row sm:items-center sm:gap-2">
               Transaction Detail
               <Badge variant="outline" className="font-mono-data text-[10px]">{txn.transactionId}</Badge>
             </DialogTitle>
-            <Button variant="outline" size="sm" onClick={() => {
+            <Button variant="outline" size="sm" className="h-6 px-2 text-[10px] gap-1 mr-2" onClick={() => {
               const csvData = [{
                 ID: txn.transactionId,
                 Amount: txn.amount,
@@ -118,7 +118,7 @@ function TransactionDetail({ txn, onClose }) {
               }];
               exportToCSV(`transaction_${txn.transactionId}.csv`, csvData);
             }}>
-              <Download className="mr-2 h-4 w-4" /> Export CSV
+              <Download className="h-3 w-3" /> Export CSV
             </Button>
           </div>
           <DialogDescription>Transaction details and ML fraud explanation</DialogDescription>
