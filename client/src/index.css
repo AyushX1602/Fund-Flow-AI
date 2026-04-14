@@ -149,6 +149,33 @@
 .bg-severity-medium { background-color: oklch(0.72 0.19 60 / 10%); }
 .bg-severity-low { background-color: oklch(0.546 0.245 262.88 / 10%); }
 
+/* ── Dashboard Card Base ── */
+.dashboard-card {
+  box-shadow:
+    0 1px 3px oklch(0 0 0 / 3%),
+    0 1px 2px oklch(0 0 0 / 2%),
+    0 0 0 1px oklch(0 0 0 / 2%);
+  transition: box-shadow 0.3s ease, border-color 0.3s ease, transform 0.3s ease;
+}
+.dashboard-card:hover {
+  box-shadow:
+    0 8px 30px oklch(0 0 0 / 8%),
+    0 4px 12px oklch(0 0 0 / 5%),
+    0 0 0 1px oklch(0 0 0 / 3%);
+}
+.dark .dashboard-card {
+  box-shadow:
+    0 1px 3px oklch(0 0 0 / 20%),
+    0 1px 2px oklch(0 0 0 / 15%),
+    0 0 0 1px oklch(1 0 0 / 4%);
+}
+.dark .dashboard-card:hover {
+  box-shadow:
+    0 8px 30px oklch(0 0 0 / 35%),
+    0 4px 12px oklch(0 0 0 / 25%),
+    0 0 0 1px oklch(1 0 0 / 6%);
+}
+
 /* ── Card enhancements ── */
 [data-slot="card"] {
   box-shadow: 0 1px 3px oklch(0 0 0 / 4%), 0 1px 2px oklch(0 0 0 / 3%);
@@ -156,6 +183,37 @@
 }
 [data-slot="card"]:hover {
   box-shadow: 0 4px 12px oklch(0 0 0 / 6%), 0 2px 4px oklch(0 0 0 / 4%);
+}
+
+/* ── Metric card specific ── */
+.metric-card {
+  box-shadow:
+    0 1px 3px oklch(0 0 0 / 3%),
+    0 1px 2px oklch(0 0 0 / 2%);
+  transition: box-shadow 0.3s ease, border-color 0.3s ease, transform 0.3s ease;
+}
+.metric-card:hover {
+  box-shadow:
+    0 8px 24px var(--card-glow, oklch(0 0 0 / 6%)),
+    0 4px 8px oklch(0 0 0 / 4%);
+  border-color: var(--card-accent, oklch(0 0 0 / 10%)) !important;
+}
+.dark .metric-card {
+  box-shadow:
+    0 1px 3px oklch(0 0 0 / 20%),
+    0 0 0 1px oklch(1 0 0 / 4%);
+}
+.dark .metric-card:hover {
+  box-shadow:
+    0 8px 28px var(--card-glow, oklch(0 0 0 / 15%)),
+    0 4px 8px oklch(0 0 0 / 15%),
+    0 0 0 1px oklch(1 0 0 / 6%);
+}
+
+/* ── Chart tooltip ── */
+.chart-tooltip {
+  backdrop-filter: blur(16px) saturate(1.5);
+  -webkit-backdrop-filter: blur(16px) saturate(1.5);
 }
 
 /* ── Live feed animation ── */
@@ -188,7 +246,7 @@
 /* ── Scrollbar styling ── */
 ::-webkit-scrollbar { width: 5px; height: 5px; }
 ::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: oklch(0.7 0 0 / 30%); border-radius: 4px; }
+::-webkit-scrollbar-thumb { background: oklch(0.7 0 0 / 25%); border-radius: 6px; }
 ::-webkit-scrollbar-thumb:hover { background: oklch(0.5 0 0 / 40%); }
 
 /* ── Monospace for financial data ── */
@@ -197,11 +255,18 @@
   font-variant-numeric: tabular-nums;
 }
 
-/* ── Recharts global styling for light theme ── */
+/* ── Recharts global styling ── */
 .recharts-cartesian-grid-horizontal line,
 .recharts-cartesian-grid-vertical line {
-  stroke: oklch(0 0 0 / 5%);
+  stroke: oklch(0 0 0 / 4%);
+}
+.dark .recharts-cartesian-grid-horizontal line,
+.dark .recharts-cartesian-grid-vertical line {
+  stroke: oklch(1 0 0 / 6%);
 }
 .recharts-tooltip-wrapper {
-  filter: drop-shadow(0 4px 12px oklch(0 0 0 / 10%));
+  filter: drop-shadow(0 8px 24px oklch(0 0 0 / 12%));
+}
+.recharts-active-dot circle {
+  filter: drop-shadow(0 0 6px currentColor);
 }

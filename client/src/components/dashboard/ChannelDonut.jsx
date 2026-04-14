@@ -1,4 +1,5 @@
 import { useState, useCallback } from "react";
+import { motion } from "framer-motion";
 import {
   Pie,
   PieChart,
@@ -7,43 +8,51 @@ import {
   ResponsiveContainer,
   Sector,
 } from "recharts";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import useDashboardStore from "@/stores/dashboardStore";
 
 /* ─── Premium colour palette ─── */
 const PALETTE = [
-  { color: "#6366f1", glow: "rgba(99,102,241,0.35)" },   // Indigo — API
-  { color: "#f59e0b", glow: "rgba(245,158,11,0.35)" },   // Amber — ATM
-  { color: "#10b981", glow: "rgba(16,185,129,0.35)" },   // Emerald — Branch
-  { color: "#3b82f6", glow: "rgba(59,130,246,0.35)" },   // Blue — Mobile App
-  { color: "#8b5cf6", glow: "rgba(139,92,246,0.35)" },   // Violet — Net Banking
-  { color: "#ec4899", glow: "rgba(236,72,153,0.35)" },   // Pink — POS
+  { color: "#6366f1", glow: "rgba(99,102,241,0.25)" },
+  { color: "#f59e0b", glow: "rgba(245,158,11,0.25)" },
+  { color: "#10b981", glow: "rgba(16,185,129,0.25)" },
+  { color: "#3b82f6", glow: "rgba(59,130,246,0.25)" },
+  { color: "#8b5cf6", glow: "rgba(139,92,246,0.25)" },
+  { color: "#ec4899", glow: "rgba(236,72,153,0.25)" },
 ];
 
-/* ─── Custom active slice (animated glow ring, NO centre text) ─── */
+/* ─── Custom active slice ─── */
 const renderActiveShape = (props) => {
   const {
-    cx, cy, innerRadius, outerRadius,
-    startAngle, endAngle, fill,
+    cx,
+    cy,
+    innerRadius,
+    outerRadius,
+    startAngle,
+    endAngle,
+    fill,
   } = props;
 
   return (
     <g>
       {/* Glow outer ring */}
       <Sector
-        cx={cx} cy={cy}
+        cx={cx}
+        cy={cy}
         innerRadius={outerRadius + 4}
-        outerRadius={outerRadius + 10}
-        startAngle={startAngle} endAngle={endAngle}
+        outerRadius={outerRadius + 12}
+        startAngle={startAngle}
+        endAngle={endAngle}
         fill={fill}
-        opacity={0.25}
+        opacity={0.2}
       />
-      {/* Main slice — slightly expanded */}
+      {/* Main slice — expanded */}
       <Sector
-        cx={cx} cy={cy}
+        cx={cx}
+        cy={cy}
         innerRadius={innerRadius}
-        outerRadius={outerRadius + 6}
-        startAngle={startAngle} endAngle={endAngle}
+        outerRadius={outerRadius + 8}
+        startAngle={startAngle}
+        endAngle={endAngle}
         fill={fill}
       />
     </g>
@@ -54,15 +63,22 @@ const renderActiveShape = (props) => {
 const CustomTooltip = ({ active, payload }) => {
   if (!active || !payload?.length) return null;
   const { name, value, payload: inner } = payload[0];
-  const pct = inner?.percent != null ? (inner.percent * 100).toFixed(1) : null;
+  const pct =
+    inner?.percent != null ? (inner.percent * 100).toFixed(1) : null;
   return (
-    <div style={{ background: "var(--card)", border: "1px solid var(--border)" }}
-      className="rounded-xl px-4 py-3 shadow-2xl text-xs">
-      <p className="font-semibold text-foreground mb-0.5">{name}</p>
-      <p className="font-mono text-sm font-bold" style={{ color: payload[0].payload?.fill }}>
+    <div className="chart-tooltip rounded-xl border border-border/40 bg-card/95 backdrop-blur-xl px-4 py-3 shadow-2xl">
+      <p className="font-semibold text-foreground text-xs mb-1">{name}</p>
+      <p
+        className="font-mono text-sm font-bold"
+        style={{ color: payload[0].payload?.fill }}
+      >
         {value.toLocaleString()} txns
       </p>
-      {pct && <p className="text-muted-foreground mt-0.5">{pct}% of total</p>}
+      {pct && (
+        <p className="text-[10px] text-muted-foreground mt-0.5">
+          {pct}% of total
+        </p>
+      )}
     </div>
   );
 };
@@ -84,15 +100,23 @@ export default function ChannelDonut() {
   const onLeave = useCallback(() => setActiveIndex(null), []);
 
   return (
-    <Card className="overflow-hidden">
-      <CardHeader className="pb-0">
-        <CardTitle className="text-sm font-semibold">Channel Breakdown</CardTitle>
-        <CardDescription className="text-xs">Transaction distribution by payment channel</CardDescription>
-      </CardHeader>
+    <motion.div
+      initial={{ opacity: 0, y: 16 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.5, delay: 0.4 }}
+      className="dashboard-card rounded-xl border border-border/60 bg-card overflow-hidden"
+    >
+      <div className="px-5 pt-5 pb-0">
+        <h3 className="text-sm font-semibold text-foreground">
+          Channel Breakdown
+        </h3>
+        <p className="text-xs text-muted-foreground mt-0.5">
+          Transaction distribution by payment channel
+        </p>
+      </div>
 
-      <CardContent className="pt-2 pb-4">
+      <div className="px-4 pt-3 pb-4">
         <div className="flex flex-col sm:flex-row items-center gap-4">
-
           {/* ─── Donut Chart ─── */}
           <div className="relative shrink-0" style={{ width: 230, height: 230 }}>
             <ResponsiveContainer width="100%" height="100%">
@@ -117,18 +141,29 @@ export default function ChannelDonut() {
                   animationEasing="ease-out"
                 >
                   {data.map((entry, i) => (
-                    <Cell key={i} fill={entry.fill} opacity={activeIndex === null || activeIndex === i ? 1 : 0.45} />
+                    <Cell
+                      key={i}
+                      fill={entry.fill}
+                      opacity={
+                        activeIndex === null || activeIndex === i ? 1 : 0.35
+                      }
+                      className="transition-opacity duration-200"
+                    />
                   ))}
                 </Pie>
               </PieChart>
             </ResponsiveContainer>
 
-            {/* Centre info — always visible */}
+            {/* Centre info */}
             <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center text-center px-2">
               {activeIndex === null ? (
                 <>
-                  <span className="font-mono text-2xl font-bold text-foreground leading-tight">{total.toLocaleString()}</span>
-                  <span className="text-[10px] text-muted-foreground mt-1">Total Txns</span>
+                  <span className="font-mono text-2xl font-bold text-foreground leading-tight">
+                    {total.toLocaleString()}
+                  </span>
+                  <span className="text-[10px] text-muted-foreground mt-1 font-medium uppercase tracking-wider">
+                    Total Txns
+                  </span>
                 </>
               ) : (
                 <>
@@ -145,7 +180,10 @@ export default function ChannelDonut() {
                     {data[activeIndex]?.name}
                   </span>
                   <span className="text-[10px] text-muted-foreground mt-0.5">
-                    {total > 0 ? ((data[activeIndex]?.value / total) * 100).toFixed(1) : 0}% of total
+                    {total > 0
+                      ? ((data[activeIndex]?.value / total) * 100).toFixed(1)
+                      : 0}
+                    % of total
                   </span>
                 </>
               )}
@@ -153,63 +191,80 @@ export default function ChannelDonut() {
           </div>
 
           {/* ─── Legend sidebar ─── */}
-          <div className="flex-1 w-full space-y-2.5 min-w-0">
+          <div className="flex-1 w-full space-y-1.5 min-w-0">
             {data.map((entry, i) => {
-              const pct = total > 0 ? ((entry.value / total) * 100).toFixed(1) : "0.0";
+              const pct =
+                total > 0
+                  ? ((entry.value / total) * 100).toFixed(1)
+                  : "0.0";
               const isActive = activeIndex === i;
               return (
-                <div
+                <motion.div
                   key={i}
-                  className="flex items-center gap-3 rounded-lg px-3 py-2 cursor-pointer transition-all duration-200"
+                  animate={{
+                    x: isActive ? 4 : 0,
+                    backgroundColor: isActive ? entry.glow : "transparent",
+                  }}
+                  transition={{ duration: 0.2 }}
+                  className="flex items-center gap-3 rounded-lg px-3 py-2 cursor-pointer"
                   style={{
-                    background: isActive ? entry.glow : "transparent",
-                    border: `1px solid ${isActive ? entry.fill + "60" : "transparent"}`,
-                    transform: isActive ? "translateX(4px)" : "none",
+                    border: `1px solid ${
+                      isActive ? entry.fill + "40" : "transparent"
+                    }`,
                   }}
                   onMouseEnter={() => setActiveIndex(i)}
                   onMouseLeave={() => setActiveIndex(null)}
                 >
-                  {/* Colour dot */}
                   <div
                     className="shrink-0 rounded-full transition-all duration-200"
                     style={{
                       width: isActive ? 12 : 10,
                       height: isActive ? 12 : 10,
                       backgroundColor: entry.fill,
-                      boxShadow: isActive ? `0 0 8px ${entry.fill}` : "none",
+                      boxShadow: isActive
+                        ? `0 0 10px ${entry.fill}80`
+                        : "none",
                     }}
                   />
 
-                  {/* Name */}
                   <span
                     className="truncate text-xs font-medium transition-colors duration-200"
-                    style={{ color: isActive ? entry.fill : "var(--muted-foreground)" }}
+                    style={{
+                      color: isActive
+                        ? entry.fill
+                        : "var(--muted-foreground)",
+                    }}
                   >
                     {entry.name}
                   </span>
 
-                  {/* Bar + stats */}
                   <div className="ml-auto flex items-center gap-2 shrink-0">
                     {/* Mini progress bar */}
-                    <div className="h-1.5 w-20 rounded-full bg-muted overflow-hidden hidden sm:block">
-                      <div
-                        className="h-full rounded-full transition-all duration-500"
-                        style={{ width: `${pct}%`, backgroundColor: entry.fill }}
+                    <div className="h-1.5 w-16 rounded-full bg-muted/80 overflow-hidden hidden sm:block">
+                      <motion.div
+                        className="h-full rounded-full"
+                        initial={{ width: 0 }}
+                        animate={{ width: `${pct}%` }}
+                        transition={{ duration: 0.8, delay: i * 0.1 }}
+                        style={{ backgroundColor: entry.fill }}
                       />
                     </div>
-                    <span className="font-mono text-[11px] font-semibold w-8 text-right" style={{ color: entry.fill }}>
+                    <span
+                      className="font-mono text-[11px] font-bold w-9 text-right"
+                      style={{ color: entry.fill }}
+                    >
                       {pct}%
                     </span>
                     <span className="font-mono text-[11px] text-muted-foreground w-12 text-right">
                       {entry.value.toLocaleString()}
                     </span>
                   </div>
-                </div>
+                </motion.div>
               );
             })}
           </div>
         </div>
-      </CardContent>
-    </Card>
+      </div>
+    </motion.div>
   );
 }

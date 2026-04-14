@@ -1,4 +1,5 @@
 import { useEffect } from "react";
+import { motion } from "framer-motion";
 import Header from "@/components/layout/Header";
 import MetricCards from "@/components/dashboard/MetricCards";
 import FraudTrendChart from "@/components/dashboard/FraudTrendChart";
@@ -22,7 +23,12 @@ export default function DashboardPage() {
         title="Dashboard"
         subtitle="Real-time fraud detection & monitoring"
       />
-      <div className="flex-1 space-y-5 p-6">
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ duration: 0.3 }}
+        className="flex-1 space-y-5 p-6"
+      >
         <MetricCards />
 
         <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
@@ -39,7 +45,7 @@ export default function DashboardPage() {
           <ChannelDonut />
           <TopRiskTable />
         </div>
-      </div>
+      </motion.div>
     </>
   );
 }
