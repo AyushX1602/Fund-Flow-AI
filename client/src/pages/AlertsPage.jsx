@@ -56,15 +56,15 @@ function AlertDetail({ alert, onClose }) {
 
   return (
     <Dialog open={!!alert} onOpenChange={onClose}>
-      <DialogContent className="max-w-lg max-h-[90vh]">
-        <DialogHeader>
+      <DialogContent className="max-w-lg overflow-hidden flex flex-col max-h-[90vh]">
+        <DialogHeader className="shrink-0">
           <DialogTitle className="flex items-center gap-2">
             <Badge variant={getSeverityVariant(alert.severity)}>{alert.severity}</Badge>
             {getAlertTypeName(alert.type)}
           </DialogTitle>
           <DialogDescription>Alert details, ML explanation, and actions</DialogDescription>
         </DialogHeader>
-        <ScrollArea className="max-h-[60vh]">
+        <ScrollArea className="flex-1 min-h-0">
           <div className="space-y-4 pr-4">
             <p className="text-sm text-muted-foreground">{alert.description}</p>
 
@@ -166,35 +166,64 @@ function AlertDetail({ alert, onClose }) {
               </div>
             )}
 
-            {/* ── Gemini LLM Panel ──────────────────────────── */}
+            {/* ── AI Analysis Panel ──────────────────────────── */}
             {llm ? (
-              /* Full panel: LLM analysis is present */
-              <div className="rounded-lg border bg-gradient-to-br from-violet-50 to-blue-50 dark:from-violet-950/20 dark:to-blue-950/20 p-3 space-y-2">
-                <div className="flex items-center justify-between">
-                  <p className="text-xs font-semibold text-violet-700 dark:text-violet-400 uppercase tracking-wider flex items-center gap-1.5">
-                    ✨ Gemini AI Analysis
-                    {llm.fromCache && <span className="text-[9px] bg-violet-100 text-violet-600 px-1 rounded">cached</span>}
-                    <span className="text-[9px] bg-violet-100 text-violet-600 px-1 rounded">{llm.model || "gemini-2.0-flash"}</span>
-                  </p>
-                  <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${
-                    llm.verdict === 'SUSPICIOUS' ? 'bg-red-100 text-red-700' :
-                    llm.verdict === 'MONITOR'    ? 'bg-amber-100 text-amber-700' :
-                                                   'bg-emerald-100 text-emerald-700'
+              (() => {
+                const isError = ['ERROR','RATE_LIMITED','TIMEOUT','QUOTA_EXHAUSTED'].includes(llm.verdict);
+                return (
+                  <div className={`rounded-lg border p-3 space-y-2 ${
+                    isError ? 'bg-muted/40 border-dashed border-muted-foreground/30' :
+                    llm.verdict === 'SUSPICIOUS' ? 'bg-red-50 dark:bg-red-950/20 border-red-200 dark:border-red-800' :
+                    llm.verdict === 'MONITOR' ? 'bg-amber-50 dark:bg-amber-950/20 border-amber-200 dark:border-amber-800' :
+                    'bg-violet-50/60 dark:bg-violet-950/20 border-violet-200 dark:border-violet-800'
                   }`}>
-                    {llm.verdict} · {(llm.confidence * 100).toFixed(0)}%
-                  </span>
-                </div>
-                <p className="text-xs text-muted-foreground leading-relaxed">{llm.reasoning}</p>
-                {llm.flags && llm.flags.length > 0 && (
-                  <div className="flex flex-wrap gap-1 pt-1">
-                    {llm.flags.map((f, i) => (
-                      <span key={i} className="text-[10px] bg-white dark:bg-slate-800 border border-violet-200 dark:border-violet-800 text-violet-700 dark:text-violet-300 px-2 py-0.5 rounded-full">
-                        {f}
-                      </span>
-                    ))}
+                    <div className="flex items-center justify-between gap-2 flex-wrap">
+                      <p className="text-xs font-semibold text-violet-700 dark:text-violet-400 flex items-center gap-1.5">
+                        ✨ AI Analysis
+                        {llm.fromCache && <span className="text-[9px] bg-violet-100 dark:bg-violet-900/40 text-violet-600 dark:text-violet-400 px-1 rounded">cached</span>}
+                        <span className="text-[9px] bg-violet-100 dark:bg-violet-900/40 text-violet-600 dark:text-violet-400 px-1 rounded">
+                          {llm.model?.replace('gemini-', 'AI ') || 'AI'}
+                        </span>
+                      </p>
+                      {!isError && (
+                        <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${
+                          llm.verdict === 'SUSPICIOUS' ? 'bg-red-100 text-red-700' :
+                          llm.verdict === 'MONITOR'    ? 'bg-amber-100 text-amber-700' :
+                                                         'bg-emerald-100 text-emerald-700'
+                        }`}>
+                          {llm.verdict} · {(llm.confidence * 100).toFixed(0)}%
+                        </span>
+                      )}
+                    </div>
+                    {isError ? (
+                      <div className="flex items-start gap-2">
+                        <span className="text-base shrink-0">⏳</span>
+                        <div>
+                          <p className="text-xs font-medium text-muted-foreground">
+                            {llm.verdict === 'RATE_LIMITED' ? 'Rate limit reached — please wait ~60 seconds and retry' :
+                             llm.verdict === 'TIMEOUT' ? 'AI service timed out — try again in a moment' :
+                             llm.verdict === 'QUOTA_EXHAUSTED' ? 'Daily AI quota exhausted — resets at midnight' :
+                             'AI service unavailable — check API configuration'}
+                          </p>
+                        </div>
+                      </div>
+                    ) : (
+                      <>
+                        <p className="text-xs text-muted-foreground leading-relaxed">{llm.reasoning}</p>
+                        {llm.flags && llm.flags.length > 0 && (
+                          <div className="flex flex-wrap gap-1 pt-1">
+                            {llm.flags.map((f, i) => (
+                              <span key={i} className="text-[10px] bg-white dark:bg-slate-800 border border-violet-200 dark:border-violet-800 text-violet-700 dark:text-violet-300 px-2 py-0.5 rounded-full">
+                                {f}
+                              </span>
+                            ))}
+                          </div>
+                        )}
+                      </>
+                    )}
                   </div>
-                )}
-              </div>
+                );
+              })()
             ) : effectiveScore >= 0.35 && effectiveScore <= 0.75 ? (
               /* Placeholder: score is uncertain zone but LLM quota exhausted or pending */
               <div className="rounded-lg border border-dashed border-violet-300 dark:border-violet-800 bg-violet-50/40 dark:bg-violet-950/10 p-3">

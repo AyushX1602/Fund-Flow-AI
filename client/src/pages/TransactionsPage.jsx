@@ -8,6 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Progress } from "@/components/ui/progress";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Separator } from "@/components/ui/separator";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ChevronLeft, ChevronRight, Search, ArrowUpDown, Download } from "lucide-react";
 import useTransactionStore from "@/stores/transactionStore";
@@ -75,7 +76,6 @@ function TransactionDetail({ txn, onClose }) {
     if (txn?.id) {
       api.post(`/ml/explain/${txn.id}`, {})
         .then((res) => {
-          // API returns { explanation: { reasons: [...] } } or { explanation: { transactionId, reasons } }
           const exp = res.data?.explanation || res.data;
           setExplanation(exp);
         })
@@ -85,7 +85,6 @@ function TransactionDetail({ txn, onClose }) {
 
   if (!txn) return null;
 
-  // Collect reasons from any available source
   const reasons = explanation?.reasons
     || explanation?.explanation?.reasons
     || txn.mlReasons
@@ -94,76 +93,94 @@ function TransactionDetail({ txn, onClose }) {
 
   return (
     <Dialog open={!!txn} onOpenChange={onClose}>
-      <DialogContent className="max-w-lg">
-        <DialogHeader>
-          <div className="flex items-center justify-between pr-10">
-            <DialogTitle className="flex flex-col items-start gap-1 sm:flex-row sm:items-center sm:gap-2">
+      <DialogContent className="max-w-lg overflow-hidden flex flex-col max-h-[90vh]">
+        <DialogHeader className="shrink-0 pr-8">
+          <div className="flex items-start justify-between gap-2 flex-wrap">
+            <DialogTitle className="text-base font-semibold leading-tight">
               Transaction Detail
-              <Badge variant="outline" className="font-mono-data text-[10px]">{txn.transactionId}</Badge>
             </DialogTitle>
-            <Button variant="outline" size="sm" className="h-6 px-2 text-[10px] gap-1 mr-2" onClick={() => {
-              const csvData = [{
-                ID: txn.transactionId,
-                Amount: txn.amount,
-                Type: txn.type,
-                Channel: txn.channel,
-                Sender: txn.senderAccount?.accountHolder || "",
-                SenderBank: txn.senderAccount?.bankName || "",
-                Receiver: txn.receiverAccount?.accountHolder || "",
-                ReceiverBank: txn.receiverAccount?.bankName || "",
-                Timestamp: new Date(txn.timestamp).toLocaleString(),
-                FraudScore: txn.fraudScore,
-                Status: txn.status,
-                Remarks: txn.description || ""
-              }];
-              exportToCSV(`transaction_${txn.transactionId}.csv`, csvData);
-            }}>
+            <Button
+              variant="outline" size="sm"
+              className="h-6 px-2 text-[10px] gap-1 shrink-0"
+              onClick={() => {
+                const csvData = [{
+                  ID: txn.transactionId,
+                  Amount: txn.amount,
+                  Type: txn.type,
+                  Channel: txn.channel,
+                  Sender: txn.senderAccount?.accountHolder || "",
+                  SenderBank: txn.senderAccount?.bankName || "",
+                  Receiver: txn.receiverAccount?.accountHolder || "",
+                  ReceiverBank: txn.receiverAccount?.bankName || "",
+                  Timestamp: new Date(txn.timestamp).toLocaleString(),
+                  FraudScore: txn.fraudScore,
+                  Status: txn.status,
+                  Remarks: txn.description || ""
+                }];
+                exportToCSV(`transaction_${txn.transactionId}.csv`, csvData);
+              }}>
               <Download className="h-3 w-3" /> Export CSV
             </Button>
           </div>
-          <DialogDescription>Transaction details and ML fraud explanation</DialogDescription>
+          <Badge variant="outline" className="font-mono-data text-[10px] w-fit mt-1 truncate max-w-full">
+            {txn.transactionId}
+          </Badge>
+          <DialogDescription className="mt-1">Transaction details and ML fraud explanation</DialogDescription>
         </DialogHeader>
-        <div className="space-y-4">
-          <div className="grid grid-cols-2 gap-3 text-sm">
-            <div>
-              <p className="text-xs text-muted-foreground">Amount</p>
-              <p className="font-mono-data font-semibold">{formatINR(txn.amount)}</p>
-            </div>
-            <div>
-              <p className="text-xs text-muted-foreground">Fraud Score</p>
-              <p className={`font-mono-data font-semibold ${getRiskColor(txn.fraudScore)}`}>
-                {formatScore(txn.fraudScore)}
-              </p>
-            </div>
-            <div>
-              <p className="text-xs text-muted-foreground">Type / Channel</p>
-              <p>{txn.type} · {txn.channel}</p>
-            </div>
-            <div>
-              <p className="text-xs text-muted-foreground">Time</p>
-              <p>{formatDateTime(txn.timestamp)}</p>
-            </div>
-            <div>
-              <p className="text-xs text-muted-foreground">Sender</p>
-              <p className="truncate">{txn.senderAccount?.accountHolder || "—"} ({txn.senderAccount?.bankName})</p>
-            </div>
-            <div>
-              <p className="text-xs text-muted-foreground">Receiver</p>
-              <p className="truncate">{txn.receiverAccount?.accountHolder || "—"} ({txn.receiverAccount?.bankName})</p>
-            </div>
-          </div>
 
-          <Separator />
+        {/* Scrollable body */}
+        <ScrollArea className="flex-1 min-h-0">
+          <div className="space-y-4 pr-3 pb-1">
+            <div className="grid grid-cols-2 gap-3 text-sm">
+              <div className="min-w-0">
+                <p className="text-xs text-muted-foreground">Amount</p>
+                <p className="font-mono-data font-semibold truncate">{formatINR(txn.amount)}</p>
+              </div>
+              <div className="min-w-0">
+                <p className="text-xs text-muted-foreground">Fraud Score</p>
+                <p className={`font-mono-data font-semibold ${getRiskColor(txn.fraudScore)}`}>
+                  {formatScore(txn.fraudScore)}
+                </p>
+              </div>
+              <div className="min-w-0">
+                <p className="text-xs text-muted-foreground">Type / Channel</p>
+                <p className="truncate">{txn.type} · {txn.channel}</p>
+              </div>
+              <div className="min-w-0">
+                <p className="text-xs text-muted-foreground">Time</p>
+                <p className="truncate">{formatDateTime(txn.timestamp)}</p>
+              </div>
+              <div className="min-w-0">
+                <p className="text-xs text-muted-foreground">Sender</p>
+                <p className="truncate">{txn.senderAccount?.accountHolder || "—"}</p>
+                <p className="text-[10px] text-muted-foreground truncate">{txn.senderAccount?.bankName}</p>
+              </div>
+              <div className="min-w-0">
+                <p className="text-xs text-muted-foreground">Receiver</p>
+                <p className="truncate">{txn.receiverAccount?.accountHolder || "—"}</p>
+                <p className="text-[10px] text-muted-foreground truncate">{txn.receiverAccount?.bankName}</p>
+              </div>
+            </div>
 
-          <div>
-            <h4 className="text-sm font-medium mb-2">ML Explanation</h4>
-            {reasons && reasons.length > 0 ? (
-              <ShapBars reasons={reasons} />
-            ) : (
-              <p className="text-xs text-muted-foreground">No explanation available</p>
+            {txn.description && (
+              <div className="rounded-lg bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800 px-3 py-2">
+                <p className="text-[10px] font-semibold text-amber-700 dark:text-amber-400 mb-0.5">Payment Remarks</p>
+                <p className="text-xs text-amber-900 dark:text-amber-300 italic break-words">"{txn.description}"</p>
+              </div>
             )}
+
+            <Separator />
+
+            <div>
+              <h4 className="text-sm font-medium mb-3">ML Explanation</h4>
+              {reasons && reasons.length > 0 ? (
+                <ShapBars reasons={reasons} />
+              ) : (
+                <p className="text-xs text-muted-foreground">No explanation available</p>
+              )}
+            </div>
           </div>
-        </div>
+        </ScrollArea>
       </DialogContent>
     </Dialog>
   );

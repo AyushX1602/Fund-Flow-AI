@@ -18,10 +18,10 @@ const logger = require("../utils/logger");
 // ─── Config ───────────────────────────────────────────────────────────────
 const UNCERTAIN_MIN = 0.35;
 const UNCERTAIN_MAX = 0.75;
-const CACHE_TTL_MS  = 15 * 60 * 1000;  // 15 min cache (saves quota)
-const MIN_GAP_MS    = 5000;            // 5s between calls = max 12/min
-const CALL_TIMEOUT  = 20000;           // 20s — free tier is slower
-const MAX_DAILY     = 50;             // Hard cap — protect free tier quota
+const CACHE_TTL_MS  = 30 * 60 * 1000;  // 30 min cache (halves quota usage)
+const MIN_GAP_MS    = 4000;            // 4s between calls = max 15/min (exact free-tier limit)
+const CALL_TIMEOUT  = 25000;           // 25s — generous timeout
+const MAX_DAILY     = 100;            // Raised cap — gemini free tier allows 1500 RPD
 
 // ─── State ────────────────────────────────────────────────────────────────
 let genAI = null;
@@ -46,9 +46,9 @@ function getModel() {
     return null;
   }
   genAI = new GoogleGenerativeAI(apiKey);
-  // gemini-2.0-flash: current model, 15 RPM on free tier
-  model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
-  logger.info("Gemini LLM service initialized (gemini-2.0-flash)");
+  // gemini-1.5-flash: higher RPD quota than 2.0-flash on free tier
+  model = genAI.getGenerativeModel({ model: "gemini-2.5-flash-preview-04-17" });
+  logger.info("Gemini LLM service initialized (gemini-1.5-flash)");
   return model;
 }
 
@@ -210,7 +210,7 @@ function parseGeminiResponse(text) {
       reasoning:  parsed.reasoning  || "LLM analysis inconclusive.",
       flags:      Array.isArray(parsed.flags) ? parsed.flags.slice(0, 3) : [],
       fromCache:  false,
-      model:      "gemini-2.0-flash",
+      model:      "gemini-2.5-flash-preview-04-17",
     };
   } catch {
     // If Gemini returns unstructured text, extract what we can
@@ -220,7 +220,7 @@ function parseGeminiResponse(text) {
       reasoning:  text.slice(0, 300),
       flags:      [],
       fromCache:  false,
-      model:      "gemini-2.0-flash",
+      model:      "gemini-2.5-flash-preview-04-17",
     };
   }
 }
@@ -244,7 +244,7 @@ async function forceAnalyse(transaction, senderAccount, mlResult, riskProfile) {
   }
   if (dailyCallCount >= MAX_DAILY) {
     logger.warn(`Gemini daily cap (${MAX_DAILY}) reached — skipping forced analysis`);
-    return { verdict: "QUOTA_EXHAUSTED", confidence: 0, reasoning: `Gemini daily quota (${MAX_DAILY} calls) exhausted. Resets at midnight.`, flags: [], model: "gemini-2.0-flash" };
+    return { verdict: "QUOTA_EXHAUSTED", confidence: 0, reasoning: `Gemini daily quota (${MAX_DAILY} calls) exhausted. Resets at midnight.`, flags: [], model: "gemini-2.5-flash-preview-04-17" };
   }
 
   // ── Cache check ────────────────────────────────────────────────────────
@@ -257,7 +257,7 @@ async function forceAnalyse(transaction, senderAccount, mlResult, riskProfile) {
   // ── Model available ────────────────────────────────────────────────────
   const llmModel = getModel();
   if (!llmModel) {
-    return { verdict: "UNAVAILABLE", confidence: 0, reasoning: "Gemini API key not configured. Add GEMINI_API_KEY to .env.", flags: [], model: "gemini-2.0-flash" };
+    return { verdict: "UNAVAILABLE", confidence: 0, reasoning: "Gemini API key not configured. Add GEMINI_API_KEY to .env.", flags: [], model: "gemini-2.5-flash-preview-04-17" };
   }
 
   // ── Rate limit ─────────────────────────────────────────────────────────
@@ -298,13 +298,13 @@ async function forceAnalyse(transaction, senderAccount, mlResult, riskProfile) {
   } catch (err) {
     if (err.message === "LLM timeout") {
       logger.warn(`Gemini timeout for forced analysis txn ${transaction.transactionId}`);
-      return { verdict: "TIMEOUT", confidence: 0, reasoning: "Gemini API timed out after 20 seconds. Try again.", flags: [], model: "gemini-2.0-flash" };
+      return { verdict: "TIMEOUT", confidence: 0, reasoning: "Gemini API timed out after 20 seconds. Try again.", flags: [], model: "gemini-2.5-flash-preview-04-17" };
     } else if (err.message?.includes("429") || err.message?.includes("quota")) {
       logger.warn("Gemini rate limit on forced analysis");
-      return { verdict: "RATE_LIMITED", confidence: 0, reasoning: "Gemini API rate limit hit (free tier: ~15 RPM). Wait 60 seconds.", flags: [], model: "gemini-2.0-flash" };
+      return { verdict: "RATE_LIMITED", confidence: 0, reasoning: "Gemini API rate limit hit (free tier: ~15 RPM). Wait 60 seconds.", flags: [], model: "gemini-2.5-flash-preview-04-17" };
     }
     logger.error("Gemini forced analysis error", { error: err.message });
-    return { verdict: "ERROR", confidence: 0, reasoning: err.message || "Unknown error", flags: [], model: "gemini-2.0-flash" };
+    return { verdict: "ERROR", confidence: 0, reasoning: err.message || "Unknown error", flags: [], model: "gemini-2.5-flash-preview-04-17" };
   }
 }
 
