@@ -1,0 +1,181 @@
+;!function(){try { var e="undefined"!=typeof globalThis?globalThis:"undefined"!=typeof global?global:"undefined"!=typeof window?window:"undefined"!=typeof self?self:{},n=(new e.Error).stack;n&&((e._debugIds|| (e._debugIds={}))[n]="fc57231d-99cd-2830-bcc6-f01936d20a66")}catch(e){}}();
+(globalThis.TURBOPACK||(globalThis.TURBOPACK=[])).push(["object"==typeof document?document.currentScript:void 0,984593,e=>{"use strict";var t=e.i(374030);let i=(e,t)=>{let i=e instanceof Map?e:new Map(e.entries()),r=t instanceof Map?t:new Map(t.entries());if(i.size!==r.size)return!1;for(let[e,t]of i)if(!r.has(e)||!Object.is(t,r.get(e)))return!1;return!0};function r(e){let r=t.default.useRef(void 0);return t=>{let n=e(t);return!function(e,t){if(Object.is(e,t))return!0;if("object"!=typeof e||null===e||"object"!=typeof t||null===t||Object.getPrototypeOf(e)!==Object.getPrototypeOf(t))return!1;if(Symbol.iterator in e&&Symbol.iterator in t){if("entries"in e&&"entries"in t)return i(e,t);let r=e[Symbol.iterator](),n=t[Symbol.iterator](),a=r.next(),o=n.next();for(;!a.done&&!o.done;){if(!Object.is(a.value,o.value))return!1;a=r.next(),o=n.next()}return!!a.done&&!!o.done}return i({entries:()=>Object.entries(e)},{entries:()=>Object.entries(t)})}(r.current,n)?r.current=n:r.current}}e.s(["useShallow",()=>r],984593)},591878,e=>{"use strict";var t=e.i(374030);let i=new Map([["bold",t.createElement(t.Fragment,null,t.createElement("path",{d:"M208.49,191.51a12,12,0,0,1-17,17L128,145,64.49,208.49a12,12,0,0,1-17-17L111,128,47.51,64.49a12,12,0,0,1,17-17L128,111l63.51-63.52a12,12,0,0,1,17,17L145,128Z"}))],["duotone",t.createElement(t.Fragment,null,t.createElement("path",{d:"M216,56V200a16,16,0,0,1-16,16H56a16,16,0,0,1-16-16V56A16,16,0,0,1,56,40H200A16,16,0,0,1,216,56Z",opacity:"0.2"}),t.createElement("path",{d:"M205.66,194.34a8,8,0,0,1-11.32,11.32L128,139.31,61.66,205.66a8,8,0,0,1-11.32-11.32L116.69,128,50.34,61.66A8,8,0,0,1,61.66,50.34L128,116.69l66.34-66.35a8,8,0,0,1,11.32,11.32L139.31,128Z"}))],["fill",t.createElement(t.Fragment,null,t.createElement("path",{d:"M208,32H48A16,16,0,0,0,32,48V208a16,16,0,0,0,16,16H208a16,16,0,0,0,16-16V48A16,16,0,0,0,208,32ZM181.66,170.34a8,8,0,0,1-11.32,11.32L128,139.31,85.66,181.66a8,8,0,0,1-11.32-11.32L116.69,128,74.34,85.66A8,8,0,0,1,85.66,74.34L128,116.69l42.34-42.35a8,8,0,0,1,11.32,11.32L139.31,128Z"}))],["light",t.createElement(t.Fragment,null,t.createElement("path",{d:"M204.24,195.76a6,6,0,1,1-8.48,8.48L128,136.49,60.24,204.24a6,6,0,0,1-8.48-8.48L119.51,128,51.76,60.24a6,6,0,0,1,8.48-8.48L128,119.51l67.76-67.75a6,6,0,0,1,8.48,8.48L136.49,128Z"}))],["regular",t.createElement(t.Fragment,null,t.createElement("path",{d:"M205.66,194.34a8,8,0,0,1-11.32,11.32L128,139.31,61.66,205.66a8,8,0,0,1-11.32-11.32L116.69,128,50.34,61.66A8,8,0,0,1,61.66,50.34L128,116.69l66.34-66.35a8,8,0,0,1,11.32,11.32L139.31,128Z"}))],["thin",t.createElement(t.Fragment,null,t.createElement("path",{d:"M202.83,197.17a4,4,0,0,1-5.66,5.66L128,133.66,58.83,202.83a4,4,0,0,1-5.66-5.66L122.34,128,53.17,58.83a4,4,0,0,1,5.66-5.66L128,122.34l69.17-69.17a4,4,0,1,1,5.66,5.66L133.66,128Z"}))]]);e.s(["default",()=>i])},813978,e=>{"use strict";let t,i;var r,n=e.i(374030);let a={data:""},o=/(?:([\u0080-\uFFFF\w-%@]+) *:? *([^{;]+?);|([^;}{]*?) *{)|(}\s*)/g,s=/\/\*[^]*?\*\/|  +/g,l=/\n+/g,d=(e,t)=>{let i="",r="",n="";for(let a in e){let o=e[a];"@"==a[0]?"i"==a[1]?i=a+" "+o+";":r+="f"==a[1]?d(o,a):a+"{"+d(o,"k"==a[1]?"":t)+"}":"object"==typeof o?r+=d(o,t?t.replace(/([^,])+/g,e=>a.replace(/([^,]*:\S+\([^)]*\))|([^,])+/g,t=>/&/.test(t)?t.replace(/&/g,e):e?e+" "+t:t)):a):null!=o&&(a=/^--/.test(a)?a:a.replace(/[A-Z]/g,"-$&").toLowerCase(),n+=d.p?d.p(a,o):a+":"+o+";")}return i+(t&&n?t+"{"+n+"}":n)+r},u={},c=e=>{if("object"==typeof e){let t="";for(let i in e)t+=i+c(e[i]);return t}return e};function p(e){let t,i,r=this||{},n=e.call?e(r.p):e;return((e,t,i,r,n)=>{var a;let p=c(e),f=u[p]||(u[p]=(e=>{let t=0,i=11;for(;t<e.length;)i=101*i+e.charCodeAt(t++)>>>0;return"go"+i})(p));if(!u[f]){let t=p!==e?e:(e=>{let t,i,r=[{}];for(;t=o.exec(e.replace(s,""));)t[4]?r.shift():t[3]?(i=t[3].replace(l," ").trim(),r.unshift(r[0][i]=r[0][i]||{})):r[0][t[1]]=t[2].replace(l," ").trim();return r[0]})(e);u[f]=d(n?{["@keyframes "+f]:t}:t,i?"":"."+f)}let m=i&&u.g?u.g:null;return i&&(u.g=u[f]),a=u[f],m?t.data=t.data.replace(m,a):-1===t.data.indexOf(a)&&(t.data=r?a+t.data:t.data+a),f})(n.unshift?n.raw?(t=[].slice.call(arguments,1),i=r.p,n.reduce((e,r,n)=>{let a=t[n];if(a&&a.call){let e=a(i),t=e&&e.props&&e.props.className||/^go/.test(e)&&e;a=t?"."+t:e&&"object"==typeof e?e.props?"":d(e,""):!1===e?"":e}return e+r+(null==a?"":a)},"")):n.reduce((e,t)=>Object.assign(e,t&&t.call?t(r.p):t),{}):n,(e=>{if("object"==typeof window){let t=(e?e.querySelector("#_goober"):window._goober)||Object.assign(document.createElement("style"),{innerHTML:" ",id:"_goober"});return t.nonce=window.__nonce__,t.parentNode||(e||document.head).appendChild(t),t.firstChild}return e||a})(r.target),r.g,r.o,r.k)}p.bind({g:1});let f,m,g,h=p.bind({k:1});function v(e,t){let i=this||{};return function(){let r=arguments;function n(a,o){let s=Object.assign({},a),l=s.className||n.className;i.p=Object.assign({theme:m&&m()},s),i.o=/ *go\d+/.test(l),s.className=p.apply(i,r)+(l?" "+l:""),t&&(s.ref=o);let d=e;return e[0]&&(d=s.as||e,delete s.as),g&&d[0]&&g(s),f(d,s)}return t?t(n):n}}var w=(e,t)=>"function"==typeof e?e(t):e,S=(t=0,()=>(++t).toString()),y=()=>{if(void 0===i&&"u">typeof window){let e=matchMedia("(prefers-reduced-motion: reduce)");i=!e||e.matches}return i},b="default",E=(e,t)=>{let{toastLimit:i}=e.settings;switch(t.type){case 0:return{...e,toasts:[t.toast,...e.toasts].slice(0,i)};case 1:return{...e,toasts:e.toasts.map(e=>e.id===t.toast.id?{...e,...t.toast}:e)};case 2:let{toast:r}=t;return E(e,{type:+!!e.toasts.find(e=>e.id===r.id),toast:r});case 3:let{toastId:n}=t;return{...e,toasts:e.toasts.map(e=>e.id===n||void 0===n?{...e,dismissed:!0,visible:!1}:e)};case 4:return void 0===t.toastId?{...e,toasts:[]}:{...e,toasts:e.toasts.filter(e=>e.id!==t.toastId)};case 5:return{...e,pausedAt:t.time};case 6:let a=t.time-(e.pausedAt||0);return{...e,pausedAt:void 0,toasts:e.toasts.map(e=>({...e,pauseDuration:e.pauseDuration+a}))}}},O=[],N={toasts:[],pausedAt:void 0,settings:{toastLimit:20}},I={},P=(e,t=b)=>{I[t]=E(I[t]||N,e),O.forEach(([e,i])=>{e===t&&i(I[t])})},D=e=>Object.keys(I).forEach(t=>P(e,t)),U=(e=b)=>t=>{P(t,e)},T={blank:4e3,error:4e3,success:2e3,loading:1/0,custom:4e3},_=(e={},t=b)=>{let[i,r]=(0,n.useState)(I[t]||N),a=(0,n.useRef)(I[t]);(0,n.useEffect)(()=>(a.current!==I[t]&&r(I[t]),O.push([t,r]),()=>{let e=O.findIndex(([e])=>e===t);e>-1&&O.splice(e,1)}),[t]);let o=i.toasts.map(t=>{var i,r,n;return{...e,...e[t.type],...t,removeDelay:t.removeDelay||(null==(i=e[t.type])?void 0:i.removeDelay)||(null==e?void 0:e.removeDelay),duration:t.duration||(null==(r=e[t.type])?void 0:r.duration)||(null==e?void 0:e.duration)||T[t.type],style:{...e.style,...null==(n=e[t.type])?void 0:n.style,...t.style}}});return{...i,toasts:o}},L=e=>(t,i)=>{let r,n=((e,t="blank",i)=>({createdAt:Date.now(),visible:!0,dismissed:!1,type:t,ariaProps:{role:"status","aria-live":"polite"},message:e,pauseDuration:0,...i,id:(null==i?void 0:i.id)||S()}))(t,e,i);return U(n.toasterId||(r=n.id,Object.keys(I).find(e=>I[e].toasts.some(e=>e.id===r))))({type:2,toast:n}),n.id},x=(e,t)=>L("blank")(e,t);x.error=L("error"),x.success=L("success"),x.loading=L("loading"),x.custom=L("custom"),x.dismiss=(e,t)=>{let i={type:3,toastId:e};t?U(t)(i):D(i)},x.dismissAll=e=>x.dismiss(void 0,e),x.remove=(e,t)=>{let i={type:4,toastId:e};t?U(t)(i):D(i)},x.removeAll=e=>x.remove(void 0,e),x.promise=(e,t,i)=>{let r=x.loading(t.loading,{...i,...null==i?void 0:i.loading});return"function"==typeof e&&(e=e()),e.then(e=>{let n=t.success?w(t.success,e):void 0;return n?x.success(n,{id:r,...i,...null==i?void 0:i.success}):x.dismiss(r),e}).catch(e=>{let n=t.error?w(t.error,e):void 0;n?x.error(n,{id:r,...i,...null==i?void 0:i.error}):x.dismiss(r)}),e};var A=1e3,k=(e,t="default")=>{let{toasts:i,pausedAt:r}=_(e,t),a=(0,n.useRef)(new Map).current,o=(0,n.useCallback)((e,t=A)=>{if(a.has(e))return;let i=setTimeout(()=>{a.delete(e),s({type:4,toastId:e})},t);a.set(e,i)},[]);(0,n.useEffect)(()=>{if(r)return;let e=Date.now(),n=i.map(i=>{if(i.duration===1/0)return;let r=(i.duration||0)+i.pauseDuration-(e-i.createdAt);if(r<0){i.visible&&x.dismiss(i.id);return}return setTimeout(()=>x.dismiss(i.id,t),r)});return()=>{n.forEach(e=>e&&clearTimeout(e))}},[i,r,t]);let s=(0,n.useCallback)(U(t),[t]),l=(0,n.useCallback)(()=>{s({type:5,time:Date.now()})},[s]),d=(0,n.useCallback)((e,t)=>{s({type:1,toast:{id:e,height:t}})},[s]),u=(0,n.useCallback)(()=>{r&&s({type:6,time:Date.now()})},[r,s]),c=(0,n.useCallback)((e,t)=>{let{reverseOrder:r=!1,gutter:n=8,defaultPosition:a}=t||{},o=i.filter(t=>(t.position||a)===(e.position||a)&&t.height),s=o.findIndex(t=>t.id===e.id),l=o.filter((e,t)=>t<s&&e.visible).length;return o.filter(e=>e.visible).slice(...r?[l+1]:[0,l]).reduce((e,t)=>e+(t.height||0)+n,0)},[i]);return(0,n.useEffect)(()=>{i.forEach(e=>{if(e.dismissed)o(e.id,e.removeDelay);else{let t=a.get(e.id);t&&(clearTimeout(t),a.delete(e.id))}})},[i,o]),{toasts:i,handlers:{updateHeight:d,startPause:l,endPause:u,calculateOffset:c}}},C=h`
+from {
+  transform: scale(0) rotate(45deg);
+	opacity: 0;
+}
+to {
+ transform: scale(1) rotate(45deg);
+  opacity: 1;
+}`,M=h`
+from {
+  transform: scale(0);
+  opacity: 0;
+}
+to {
+  transform: scale(1);
+  opacity: 1;
+}`,R=h`
+from {
+  transform: scale(0) rotate(90deg);
+	opacity: 0;
+}
+to {
+  transform: scale(1) rotate(90deg);
+	opacity: 1;
+}`,F=v("div")`
+  width: 20px;
+  opacity: 0;
+  height: 20px;
+  border-radius: 10px;
+  background: ${e=>e.primary||"#ff4b4b"};
+  position: relative;
+  transform: rotate(45deg);
+
+  animation: ${C} 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275)
+    forwards;
+  animation-delay: 100ms;
+
+  &:after,
+  &:before {
+    content: '';
+    animation: ${M} 0.15s ease-out forwards;
+    animation-delay: 150ms;
+    position: absolute;
+    border-radius: 3px;
+    opacity: 0;
+    background: ${e=>e.secondary||"#fff"};
+    bottom: 9px;
+    left: 4px;
+    height: 2px;
+    width: 12px;
+  }
+
+  &:before {
+    animation: ${R} 0.15s ease-out forwards;
+    animation-delay: 180ms;
+    transform: rotate(90deg);
+  }
+`,j=h`
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+`,H=v("div")`
+  width: 12px;
+  height: 12px;
+  box-sizing: border-box;
+  border: 2px solid;
+  border-radius: 100%;
+  border-color: ${e=>e.secondary||"#e0e0e0"};
+  border-right-color: ${e=>e.primary||"#616161"};
+  animation: ${j} 1s linear infinite;
+`,$=h`
+from {
+  transform: scale(0) rotate(45deg);
+	opacity: 0;
+}
+to {
+  transform: scale(1) rotate(45deg);
+	opacity: 1;
+}`,q=h`
+0% {
+	height: 0;
+	width: 0;
+	opacity: 0;
+}
+40% {
+  height: 0;
+	width: 6px;
+	opacity: 1;
+}
+100% {
+  opacity: 1;
+  height: 10px;
+}`,z=v("div")`
+  width: 20px;
+  opacity: 0;
+  height: 20px;
+  border-radius: 10px;
+  background: ${e=>e.primary||"#61d345"};
+  position: relative;
+  transform: rotate(45deg);
+
+  animation: ${$} 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275)
+    forwards;
+  animation-delay: 100ms;
+  &:after {
+    content: '';
+    box-sizing: border-box;
+    animation: ${q} 0.2s ease-out forwards;
+    opacity: 0;
+    animation-delay: 200ms;
+    position: absolute;
+    border-right: 2px solid;
+    border-bottom: 2px solid;
+    border-color: ${e=>e.secondary||"#fff"};
+    bottom: 6px;
+    left: 6px;
+    height: 10px;
+    width: 6px;
+  }
+`,G=v("div")`
+  position: absolute;
+`,V=v("div")`
+  position: relative;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-width: 20px;
+  min-height: 20px;
+`,W=h`
+from {
+  transform: scale(0.6);
+  opacity: 0.4;
+}
+to {
+  transform: scale(1);
+  opacity: 1;
+}`,Z=v("div")`
+  position: relative;
+  transform: scale(0.6);
+  opacity: 0.4;
+  min-width: 20px;
+  animation: ${W} 0.3s 0.12s cubic-bezier(0.175, 0.885, 0.32, 1.275)
+    forwards;
+`,B=({toast:e})=>{let{icon:t,type:i,iconTheme:r}=e;return void 0!==t?"string"==typeof t?n.createElement(Z,null,t):t:"blank"===i?null:n.createElement(V,null,n.createElement(H,{...r}),"loading"!==i&&n.createElement(G,null,"error"===i?n.createElement(F,{...r}):n.createElement(z,{...r})))},K=v("div")`
+  display: flex;
+  align-items: center;
+  background: #fff;
+  color: #363636;
+  line-height: 1.3;
+  will-change: transform;
+  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.1), 0 3px 3px rgba(0, 0, 0, 0.05);
+  max-width: 350px;
+  pointer-events: auto;
+  padding: 8px 10px;
+  border-radius: 8px;
+`,X=v("div")`
+  display: flex;
+  justify-content: center;
+  margin: 4px 10px;
+  color: inherit;
+  flex: 1 1 auto;
+  white-space: pre-line;
+`,Y=n.memo(({toast:e,position:t,style:i,children:r})=>{let a=e.height?((e,t)=>{let i=e.includes("top")?1:-1,[r,n]=y()?["0%{opacity:0;} 100%{opacity:1;}","0%{opacity:1;} 100%{opacity:0;}"]:[`
+0% {transform: translate3d(0,${-200*i}%,0) scale(.6); opacity:.5;}
+100% {transform: translate3d(0,0,0) scale(1); opacity:1;}
+`,`
+0% {transform: translate3d(0,0,-1px) scale(1); opacity:1;}
+100% {transform: translate3d(0,${-150*i}%,-1px) scale(.6); opacity:0;}
+`];return{animation:t?`${h(r)} 0.35s cubic-bezier(.21,1.02,.73,1) forwards`:`${h(n)} 0.4s forwards cubic-bezier(.06,.71,.55,1)`}})(e.position||t||"top-center",e.visible):{opacity:0},o=n.createElement(B,{toast:e}),s=n.createElement(X,{...e.ariaProps},w(e.message,e));return n.createElement(K,{className:e.className,style:{...a,...i,...e.style}},"function"==typeof r?r({icon:o,message:s}):n.createElement(n.Fragment,null,o,s))});r=n.createElement,d.p=void 0,f=r,m=void 0,g=void 0;var J=({id:e,className:t,style:i,onHeightUpdate:r,children:a})=>{let o=n.useCallback(t=>{if(t){let i=()=>{r(e,t.getBoundingClientRect().height)};i(),new MutationObserver(i).observe(t,{subtree:!0,childList:!0,characterData:!0})}},[e,r]);return n.createElement("div",{ref:o,className:t,style:i},a)},Q=p`
+  z-index: 9999;
+  > * {
+    pointer-events: auto;
+  }
+`,ee=({reverseOrder:e,position:t="top-center",toastOptions:i,gutter:r,children:a,toasterId:o,containerStyle:s,containerClassName:l})=>{let{toasts:d,handlers:u}=k(i,o);return n.createElement("div",{"data-rht-toaster":o||"",style:{position:"fixed",zIndex:9999,top:16,left:16,right:16,bottom:16,pointerEvents:"none",...s},className:l,onMouseEnter:u.startPause,onMouseLeave:u.endPause},d.map(i=>{let o,s,l=i.position||t,d=u.calculateOffset(i,{reverseOrder:e,gutter:r,defaultPosition:t}),c=(o=l.includes("top"),s=l.includes("center")?{justifyContent:"center"}:l.includes("right")?{justifyContent:"flex-end"}:{},{left:0,right:0,display:"flex",position:"absolute",transition:y()?void 0:"all 230ms cubic-bezier(.21,1.02,.73,1)",transform:`translateY(${d*(o?1:-1)}px)`,...o?{top:0}:{bottom:0},...s});return n.createElement(J,{id:i.id,key:i.id,onHeightUpdate:u.updateHeight,className:i.visible?Q:"",style:c},"custom"===i.type?w(i.message,i):a?a(i):n.createElement(Y,{toast:i,position:l}))}))};e.s(["CheckmarkIcon",()=>z,"ErrorIcon",()=>F,"LoaderIcon",()=>H,"ToastBar",()=>Y,"ToastIcon",()=>B,"Toaster",()=>ee,"default",()=>x,"resolveValue",()=>w,"toast",()=>x,"useToaster",()=>k,"useToasterStore",()=>_],813978)},939843,e=>{"use strict";var t=e.i(374030),i=e.i(94884),r=e.i(591878);let n=t.forwardRef((e,n)=>t.createElement(i.default,{ref:n,...e,weights:r.default}));n.displayName="XIcon",e.s(["X",()=>n,"XIcon",()=>n])},743910,e=>{"use strict";var t=e.i(750180),i=e.i(839725);let r=async e=>(0,i.apiRequest)({url:t.API_URLS.user.updateProfile,data:e}),n=async e=>(0,i.apiRequest)({url:t.API_URLS.user.uploadProfileImage,method:"POST",data:e,customHeaders:{"Content-Type":"multipart/form-data"}}),a=async()=>(0,i.apiRequest)({url:t.API_URLS.user.getTotalTokens,data:{}}),o=async e=>(0,i.apiRequest)({url:t.API_URLS.user.getTotalTokens,data:{totalCompetitors:e}});e.s(["getCompetitorTokenUsage",0,o,"getTokenUsage",0,a,"updateProfile",0,r,"uploadProfileImage",0,n])},856284,e=>{"use strict";var t=e.i(750180),i=e.i(839725);let r=async e=>(0,i.apiRequest)({url:t.API_URLS.auth.upsertUserDevice,method:"POST",data:e});e.s(["upsertUserDevice",0,r])},346507,e=>{"use strict";let t,i=!1,r=!1;async function n(){var e;let t;return await (null==(e=window.OneSignalDeferred)?void 0:e.push(e=>{t=e.User.getTags()})),t}async function a(){var e;let t;return await (null==(e=window.OneSignalDeferred)?void 0:e.push(e=>{t=e.User.getLanguage()})),t}"u">typeof window&&(window.OneSignalDeferred=window.OneSignalDeferred||[],(t=document.createElement("script")).id="onesignal-sdk",t.defer=!0,t.src="https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js",t.onerror=()=>{r=!0},document.head.appendChild(t));let o={login:function(e,t){return new Promise((i,n)=>{var a;r?n(Error("OneSignal script failed to load.")):null==(a=window.OneSignalDeferred)||a.push(r=>{r.login(e,t).then(()=>i()).catch(e=>n(e))})})},logout:function(){return new Promise((e,t)=>{var i;r?t(Error("OneSignal script failed to load.")):null==(i=window.OneSignalDeferred)||i.push(i=>{i.logout().then(()=>e()).catch(e=>t(e))})})},init:e=>{var t;return i?Promise.reject("OneSignal is already initialized."):e&&e.appId?document?((null==(t=e.welcomeNotification)?void 0:t.disabled)!==void 0&&(e.welcomeNotification.disable=e.welcomeNotification.disabled),new Promise((t,r)=>{var n;null==(n=window.OneSignalDeferred)||n.push(n=>{n.init(e).then(()=>{i=!0,t()}).catch(r)})})):Promise.reject("Document is not defined."):Promise.reject("You need to provide your OneSignal appId.")},setConsentGiven:function(e){return new Promise((t,i)=>{var n;r?i(Error("OneSignal script failed to load.")):null==(n=window.OneSignalDeferred)||n.push(r=>{r.setConsentGiven(e).then(()=>t()).catch(e=>i(e))})})},setConsentRequired:function(e){return new Promise((t,i)=>{var n;r?i(Error("OneSignal script failed to load.")):null==(n=window.OneSignalDeferred)||n.push(r=>{r.setConsentRequired(e).then(()=>t()).catch(e=>i(e))})})},Slidedown:{promptPush:function(e){return new Promise((t,i)=>{var n;r?i(Error("OneSignal script failed to load.")):null==(n=window.OneSignalDeferred)||n.push(r=>{r.Slidedown.promptPush(e).then(()=>t()).catch(e=>i(e))})})},promptPushCategories:function(e){return new Promise((t,i)=>{var n;r?i(Error("OneSignal script failed to load.")):null==(n=window.OneSignalDeferred)||n.push(r=>{r.Slidedown.promptPushCategories(e).then(()=>t()).catch(e=>i(e))})})},promptSms:function(e){return new Promise((t,i)=>{var n;r?i(Error("OneSignal script failed to load.")):null==(n=window.OneSignalDeferred)||n.push(r=>{r.Slidedown.promptSms(e).then(()=>t()).catch(e=>i(e))})})},promptEmail:function(e){return new Promise((t,i)=>{var n;r?i(Error("OneSignal script failed to load.")):null==(n=window.OneSignalDeferred)||n.push(r=>{r.Slidedown.promptEmail(e).then(()=>t()).catch(e=>i(e))})})},promptSmsAndEmail:function(e){return new Promise((t,i)=>{var n;r?i(Error("OneSignal script failed to load.")):null==(n=window.OneSignalDeferred)||n.push(r=>{r.Slidedown.promptSmsAndEmail(e).then(()=>t()).catch(e=>i(e))})})},addEventListener:function(e,t){var i;null==(i=window.OneSignalDeferred)||i.push(i=>{i.Slidedown.addEventListener(e,t)})},removeEventListener:function(e,t){var i;null==(i=window.OneSignalDeferred)||i.push(i=>{i.Slidedown.removeEventListener(e,t)})}},Notifications:{get permissionNative(){var s,l;return(null==(l=null==(s=window.OneSignal)?void 0:s.Notifications)?void 0:l.permissionNative)??"default"},get permission(){var d,u;return(null==(u=null==(d=window.OneSignal)?void 0:d.Notifications)?void 0:u.permission)??!1},setDefaultUrl:function(e){return new Promise((t,i)=>{var n;r?i(Error("OneSignal script failed to load.")):null==(n=window.OneSignalDeferred)||n.push(r=>{r.Notifications.setDefaultUrl(e).then(()=>t()).catch(e=>i(e))})})},setDefaultTitle:function(e){return new Promise((t,i)=>{var n;r?i(Error("OneSignal script failed to load.")):null==(n=window.OneSignalDeferred)||n.push(r=>{r.Notifications.setDefaultTitle(e).then(()=>t()).catch(e=>i(e))})})},isPushSupported:()=>"u">typeof PushSubscriptionOptions&&PushSubscriptionOptions.prototype.hasOwnProperty("applicationServerKey")||window.safari&&"u">typeof window.safari.pushNotification||window.top!==window&&"Apple Computer, Inc."===navigator.vendor&&"MacIntel"===navigator.platform,requestPermission:function(){return new Promise((e,t)=>{var i;r?t(Error("OneSignal script failed to load.")):null==(i=window.OneSignalDeferred)||i.push(i=>{i.Notifications.requestPermission().then(t=>e(t)).catch(e=>t(e))})})},addEventListener:function(e,t){var i;null==(i=window.OneSignalDeferred)||i.push(i=>{i.Notifications.addEventListener(e,t)})},removeEventListener:function(e,t){var i;null==(i=window.OneSignalDeferred)||i.push(i=>{i.Notifications.removeEventListener(e,t)})}},Session:{sendOutcome:function(e,t){return new Promise((i,n)=>{var a;r?n(Error("OneSignal script failed to load.")):null==(a=window.OneSignalDeferred)||a.push(r=>{r.Session.sendOutcome(e,t).then(()=>i()).catch(e=>n(e))})})},sendUniqueOutcome:function(e){return new Promise((t,i)=>{var n;r?i(Error("OneSignal script failed to load.")):null==(n=window.OneSignalDeferred)||n.push(r=>{r.Session.sendUniqueOutcome(e).then(()=>t()).catch(e=>i(e))})})}},User:{get onesignalId(){var c,p;return null==(p=null==(c=window.OneSignal)?void 0:c.User)?void 0:p.onesignalId},get externalId(){var f,m;return null==(m=null==(f=window.OneSignal)?void 0:f.User)?void 0:m.externalId},addAlias:function(e,t){var i;null==(i=window.OneSignalDeferred)||i.push(i=>{i.User.addAlias(e,t)})},addAliases:function(e){var t;null==(t=window.OneSignalDeferred)||t.push(t=>{t.User.addAliases(e)})},removeAlias:function(e){var t;null==(t=window.OneSignalDeferred)||t.push(t=>{t.User.removeAlias(e)})},removeAliases:function(e){var t;null==(t=window.OneSignalDeferred)||t.push(t=>{t.User.removeAliases(e)})},addEmail:function(e){var t;null==(t=window.OneSignalDeferred)||t.push(t=>{t.User.addEmail(e)})},removeEmail:function(e){var t;null==(t=window.OneSignalDeferred)||t.push(t=>{t.User.removeEmail(e)})},addSms:function(e){var t;null==(t=window.OneSignalDeferred)||t.push(t=>{t.User.addSms(e)})},removeSms:function(e){var t;null==(t=window.OneSignalDeferred)||t.push(t=>{t.User.removeSms(e)})},addTag:function(e,t){var i;null==(i=window.OneSignalDeferred)||i.push(i=>{i.User.addTag(e,t)})},addTags:function(e){var t;null==(t=window.OneSignalDeferred)||t.push(t=>{t.User.addTags(e)})},removeTag:function(e){var t;null==(t=window.OneSignalDeferred)||t.push(t=>{t.User.removeTag(e)})},removeTags:function(e){var t;null==(t=window.OneSignalDeferred)||t.push(t=>{t.User.removeTags(e)})},getTags:n,addEventListener:function(e,t){var i;null==(i=window.OneSignalDeferred)||i.push(i=>{i.User.addEventListener(e,t)})},removeEventListener:function(e,t){var i;null==(i=window.OneSignalDeferred)||i.push(i=>{i.User.removeEventListener(e,t)})},setLanguage:function(e){var t;null==(t=window.OneSignalDeferred)||t.push(t=>{t.User.setLanguage(e)})},getLanguage:a,trackEvent:function(e,t){var i;null==(i=window.OneSignalDeferred)||i.push(i=>{i.User.trackEvent(e,t)})},PushSubscription:{get id(){var g,h,v;return null==(v=null==(h=null==(g=window.OneSignal)?void 0:g.User)?void 0:h.PushSubscription)?void 0:v.id},get token(){var w,S,y;return null==(y=null==(S=null==(w=window.OneSignal)?void 0:w.User)?void 0:S.PushSubscription)?void 0:y.token},get optedIn(){var b,E,O;return null==(O=null==(E=null==(b=window.OneSignal)?void 0:b.User)?void 0:E.PushSubscription)?void 0:O.optedIn},optIn:function(){return new Promise((e,t)=>{var i;r?t(Error("OneSignal script failed to load.")):null==(i=window.OneSignalDeferred)||i.push(i=>{i.User.PushSubscription.optIn().then(()=>e()).catch(e=>t(e))})})},optOut:function(){return new Promise((e,t)=>{var i;r?t(Error("OneSignal script failed to load.")):null==(i=window.OneSignalDeferred)||i.push(i=>{i.User.PushSubscription.optOut().then(()=>e()).catch(e=>t(e))})})},addEventListener:function(e,t){var i;null==(i=window.OneSignalDeferred)||i.push(i=>{i.User.PushSubscription.addEventListener(e,t)})},removeEventListener:function(e,t){var i;null==(i=window.OneSignalDeferred)||i.push(i=>{i.User.PushSubscription.removeEventListener(e,t)})}}},Debug:{setLogLevel:function(e){var t;null==(t=window.OneSignalDeferred)||t.push(t=>{t.Debug.setLogLevel(e)})}}};e.s(["default",()=>o])},449633,e=>{"use strict";let t;var i=e.i(374030),r=e.i(320500),n=e.i(914673),a=e.i(743910),o=e.i(856284),s=e.i(738917),l=e.i(793720),d=e.i(375526),u=e.i(116178),c=e.i(659829),p=e.i(991096),f=e.i(228435),m=e.i(779807),g=e.i(346507),h=e.i(984593);let v=!1,w=null,S=null,y=new Map,b=()=>{try{return c.encryptLocalStorage.get(s.ONESIGNAL_DENIED_THREAD_IDS)||[]}catch(e){return console.error("Failed to get denied thread IDs:",e),[]}},E=e=>{if(e)try{let t=b();t.includes(e)||(t.push(e),c.encryptLocalStorage.set(s.ONESIGNAL_DENIED_THREAD_IDS,t))}catch(e){console.error("Failed to add denied thread ID:",e)}},O=e=>{if(e)try{let t=b().filter(t=>t!==e);c.encryptLocalStorage.set(s.ONESIGNAL_DENIED_THREAD_IDS,t)}catch(e){console.error("Failed to remove denied thread ID:",e)}},N=e=>!!e&&b().includes(e),I=async(e,t,i,r)=>{if(v)try{let a=r?.threadId;if(a){let e=y.get(a);e&&e(!1)}if((e||t)&&(w={userId:e,email:t}),await P(t))return;if(S&&r){let e=r?.useCase?(0,m.getAppLabelByUseCase)(r.useCase):void 0,t=r?.framework||r?.application?.framework;S({eventName:l.SEGMENT_EVENTS.NOTIFICATION_PERMISSION_PROMPT_SHOWN,properties:{...r?.threadId&&{thread_id:r.threadId},...e&&{use_case:e},...t&&{framework:t}}})}await g.default.Notifications.requestPermission().then(async e=>{if(console.log("Native permission prompt result:",e),e){if(r?.threadId&&O(r.threadId),r?.threadId&&await (0,n.sendNotifyMail)({data:{threadId:r.threadId,pushNotificationEnabled:!0}}),t){await U(t);let e=await g.default.User.PushSubscription.id;console.log("oneSignalUserId subscription Id",e),e&&i!==e&&(await (0,o.upsertUserDevice)({deviceId:e,provider:1,deviceType:3,isSupportedLiveNotification:!0,notificationEnabled:!0}),f.useUserStore.getState().setUser(t=>({...t,deviceId:e})))}w=null}else r?.threadId&&E(r.threadId),f.useUserStore.getState().setUser(e=>{let{deviceId:t,...i}=e;return i})}).catch(e=>{console.error("Native permission prompt error:",e),S&&S({eventName:l.SEGMENT_EVENTS.NOTIFICATION_PERMISSION_PROMPT_NOT_SHOWN,properties:{...r?.threadId&&{thread_id:r.threadId},reason:"permission_denied",error:e}})})}catch(e){console.error("Failed to request notification permission:",e)}},P=async e=>{try{let t=await g.default.User.PushSubscription.id,i=await g.default.User.PushSubscription.optedIn;if(console.log("subscriptionId",t,i),e){let r=await g.default.User.externalId;return console.log("email",e),console.log("oneSignalExternalId",r,e),!!(t&&i&&r===e)}return!!(t&&i)}catch(e){return console.error("Failed to check subscription status:",e),!1}},D=async e=>{try{let t=await g.default.User.onesignalId,i=await g.default.User.externalId;return!!(t&&e&&i===String(e))}catch(e){return!1}},U=async e=>{console.log("registerUserWithOneSignal");try{if(!e||await D(e))return;await g.default.login(e),await g.default.User.PushSubscription.optIn(),await g.default.User.addEmail(e)}catch(e){console.error("Failed to register user with OneSignal:",e)}},T=async()=>{try{if(!v){w=null,S=null,t=void 0;return}let e=await g.default.User.PushSubscription.id;console.log("oneSignalUserId subscription Id",e),e&&await (0,o.upsertUserDevice)({deviceId:e,provider:1,deviceType:3,isSupportedLiveNotification:!0,notificationEnabled:!1,isOptedOut:!0}),await g.default.User.PushSubscription.optOut();try{await g.default.logout()}catch(e){console.error("Failed to logout from OneSignal:",e)}w=null,S=null,t=void 0}catch(e){console.error("Failed to logout from OneSignal:",e),w=null,S=null,t=void 0}},_=async(e,i,r,a)=>{if(console.log("check isInitialized"),!v)return void console.warn("OneSignal is not initialized. Cannot prompt for permission.");try{if(!g.default.Notifications.isPushSupported()){console.warn("Push notifications are not supported in this browser."),S&&S({eventName:l.SEGMENT_EVENTS.NOTIFICATION_PERMISSION_PROMPT_NOT_SHOWN,properties:{...t&&{thread_id:t},reason:"push_not_supported"}});return}let s=a?.threadId;if(s&&N(s)){console.warn(`Notification permission was previously denied for thread ${s}. Cannot prompt again for this thread.`),S&&S({eventName:l.SEGMENT_EVENTS.NOTIFICATION_PERMISSION_PROMPT_NOT_SHOWN,properties:{...t&&{thread_id:t},reason:"thread_previously_denied"}});return}let d=g.default.Notifications.permissionNative;if("denied"===d){console.warn("Notification permission was previously denied. Cannot prompt again."),S&&S({eventName:l.SEGMENT_EVENTS.NOTIFICATION_PERMISSION_PROMPT_NOT_SHOWN,properties:{...t&&{thread_id:t},reason:"permission_previously_denied"}});return}if("granted"===d&&(await (0,n.sendNotifyMail)({data:{threadId:a?.threadId,pushNotificationEnabled:!0}}),await P(i))){if(i){await U(i);let e=await g.default.User.PushSubscription.id;e&&r!==e&&(await (0,o.upsertUserDevice)({deviceId:e,provider:1,deviceType:3,isSupportedLiveNotification:!0,notificationEnabled:!0}),f.useUserStore.getState().setUser(t=>({...t,deviceId:e})))}return}(e||i)&&(w={userId:e,email:i});let u=s?y.get(s):null;u?u(!0):await g.default.Notifications.requestPermission().then(async e=>{if(console.log("Native permission prompt result:",e),i){await U(i);let e=await g.default.User.PushSubscription.id;e&&r!==e&&(await (0,o.upsertUserDevice)({deviceId:e,provider:1,deviceType:3,isSupportedLiveNotification:!0,notificationEnabled:!0}),f.useUserStore.getState().setUser(t=>({...t,deviceId:e})))}}).catch(e=>{console.error("Native permission prompt error:",e)})}catch(e){console.error("Failed to prompt for notification permission:",e)}};e.s(["addDeniedThreadId",0,E,"default",0,()=>{let{userData:e}=(0,f.useUserStore)((0,h.useShallow)(e=>({userData:e.userData}))),s=(0,r.useRouter)(),{segmentTrack:c}=(0,d.useSegmentAnalytics)(),y=(0,i.useRef)(!1),b=(0,i.useRef)(c),N=(0,i.useRef)(null),{settings:I}=(0,p.usePlaygroundStore)((0,h.useShallow)(e=>({settings:e.settings})));return(0,i.useEffect)(()=>{b.current=c,S=c},[c]),(0,i.useEffect)(()=>{t=I?.threadId},[I?.threadId]),(0,i.useEffect)(()=>{if((u.AuthService.getToken()||e?.authSession?.isAuthenticated)&&!y.current&&!v)return g.default.init({appId:"37c4d8e2-9a93-42ac-9210-9530e2985574",notificationClickHandlerMatch:"exact",notificationClickHandlerAction:"navigate",webhook:{cors:!1,"notification.willDisplay":"https://back.rocket.new/api/onesignal/push-notification/webhook","notification.clicked":"https://back.rocket.new/api/onesignal/push-notification/webhook","notification.dismissed":"https://back.rocket.new/api/onesignal/push-notification/webhook"}}).then(async()=>{v=!0,y.current=!0;let e=async e=>{console.log("handlePermissionChange",e);let t=p.usePlaygroundStore.getState(),i=t.settings,r=t.threadDetails,s=f.useUserStore.getState().userData,d=i?.threadId,u=r?.useCase?(0,m.getAppLabelByUseCase)(r.useCase):void 0,c=r?.framework||r?.application?.framework;if(e){let e,t=await P();if(console.log("hasSubscription",t),await (0,a.updateProfile)({isWebNotificationEnabled:!0}),f.useUserStore.getState().setUser(e=>({...e,settings:{...e.settings,isWebNotificationEnabled:!0}})),await (0,n.sendNotifyMail)({data:{threadId:i?.threadId,pushNotificationEnabled:!0}}),t){console.log("already an active subscriber, don't register or create subscription again"),setTimeout(async()=>{e=await g.default.User.PushSubscription.id,f.useUserStore.getState().setUser(e=>({...e,settings:{...e.settings,isWebNotificationEnabled:!0}}));let t=s?.deviceId;e&&t!==e&&((0,o.upsertUserDevice)({deviceId:e,provider:1,deviceType:3,isSupportedLiveNotification:!0,notificationEnabled:!0}),f.useUserStore.getState().setUser(t=>({...t,deviceId:e})))},1e4);return}if(w?.email){let e;await U(w.email),w=null,setTimeout(async()=>{e=await g.default.User.PushSubscription.id;let t=s?.deviceId;e&&t!==e&&((0,o.upsertUserDevice)({deviceId:e,provider:1,deviceType:3,isSupportedLiveNotification:!0,notificationEnabled:!0}),f.useUserStore.getState().setUser(t=>({...t,deviceId:e})))},1e4)}d&&O(d),b.current({eventName:l.SEGMENT_EVENTS.PUSH_NOTIFICATION_PERMISSION_GRANTED,properties:{...d&&{thread_id:d,app_name:r?.application?.displayName},...u&&{use_case:u},...c&&{framework:c},app_name:r?.application?.displayName}});try{console.log("oneSignalUserId",e),e&&(b.current({eventName:l.SEGMENT_EVENTS.PUSH_NOTIFICATION_SUBSCRIPTION_CREATED,properties:{...d&&{thread_id:d,app_name:r?.application?.displayName},...u&&{use_case:u},...c&&{framework:c},device_id:e,app_name:r?.application?.displayName}}),console.log("upserting user device"))}catch(e){console.error("Failed to upsert user device:",e)}}else b.current({eventName:l.SEGMENT_EVENTS.PUSH_NOTIFICATION_PERMISSION_DENIED,properties:{...d&&{thread_id:d,app_name:r?.application?.displayName},...u&&{use_case:u},...c&&{framework:c},app_name:r?.application?.displayName}}),await (0,a.updateProfile)({isWebNotificationEnabled:!1}),await (0,n.sendNotifyMail)({data:{threadId:i?.threadId,pushNotificationEnabled:!1}}),f.useUserStore.getState().setUser(e=>{let{deviceId:t,...i}=e;return{...i,settings:{...i.settings,isWebNotificationEnabled:!1}}}),d&&E(d),w=null};N.current=e,g.default.Notifications.addEventListener("permissionChange",e),S=b.current;let i=p.usePlaygroundStore.getState();t=i.settings?.threadId}).catch(e=>{console.error("OneSignal initialization failed:",e)}),()=>{if(N.current&&v)try{g.default.Notifications.removeEventListener("permissionChange",N.current),N.current=null}catch(e){console.error("Error removing permissionChange listener:",e)}}},[e?.authSession?.isAuthenticated,e?._id,e?.email,s]),null},"getShowCustomNotificationPrompt",0,e=>!!e&&y.has(e),"logoutOneSignal",0,T,"promptNotificationPermission",0,_,"removeShowCustomNotificationPrompt",0,e=>{e&&y.delete(e)},"requestNotificationPermission",0,I,"setShowCustomNotificationPrompt",0,(e,t)=>{t?y.set(t,e):y.clear()},"shouldAskForNotificationPermission",0,e=>{if(!v)return!1;try{if(!g.default.Notifications.isPushSupported()||e&&N(e))return!1;let t=g.default.Notifications.permissionNative;if("denied"===t||"granted"===t)return!1;return!0}catch(e){return console.error("Failed to check if should ask for permission:",e),!1}}])}]);
+
+//# debugId=fc57231d-99cd-2830-bcc6-f01936d20a66
+//# sourceMappingURL=c56413e2f56be3ab.js.map

@@ -9,6 +9,7 @@ import AccountsPage from "@/pages/AccountsPage";
 import InvestigationsPage from "@/pages/InvestigationsPage";
 import ModelPage from "@/pages/ModelPage";
 import AnalyzePage from "@/pages/AnalyzePage";
+import LandingPage from "@/pages/LandingPage";
 import socket from "@/lib/socket";
 import useTransactionStore from "@/stores/transactionStore";
 import useAlertStore from "@/stores/alertStore";
@@ -75,8 +76,9 @@ export default function App() {
     <BrowserRouter>
       <SocketProvider>
         <Routes>
+          <Route path="/" element={<LandingPage />} />
           <Route element={<Layout />}>
-            <Route path="/" element={<DashboardPage />} />
+            <Route path="/dashboard" element={<DashboardPage />} />
             <Route path="/transactions" element={<TransactionsPage />} />
             <Route path="/alerts" element={<AlertsPage />} />
             <Route path="/network" element={<NetworkPage />} />

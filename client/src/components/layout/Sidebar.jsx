@@ -15,32 +15,32 @@ import useThemeStore from "@/stores/themeStore"
 
 // ─── Nav items for FundFlow ────────────────────────────────────────────────
 const navItems = [
-  { to: "/",               icon: LayoutDashboard, label: "Dashboard",      end: true },
-  { to: "/transactions",   icon: ArrowLeftRight,  label: "Transactions"               },
-  { to: "/alerts",         icon: ShieldAlert,     label: "Alerts",         badge: true },
-  { to: "/network",        icon: Network,         label: "Network Graph"              },
-  { to: "/accounts",       icon: Users,           label: "Accounts"                   },
-  { to: "/investigations", icon: FileSearch,      label: "Investigations"             },
-  { to: "/model",          icon: Brain,           label: "ML Model"                   },
-  { to: "/analyze",        icon: FlaskConical,    label: "Analyze"                    },
+  { to: "/", icon: LayoutDashboard, label: "Dashboard", end: true },
+  { to: "/transactions", icon: ArrowLeftRight, label: "Transactions" },
+  { to: "/alerts", icon: ShieldAlert, label: "Alerts", badge: true },
+  { to: "/network", icon: Network, label: "Network Graph" },
+  { to: "/accounts", icon: Users, label: "Accounts" },
+  { to: "/investigations", icon: FileSearch, label: "Investigations" },
+  { to: "/model", icon: Brain, label: "ML Model" },
+  { to: "/analyze", icon: FlaskConical, label: "Analyze" },
 ]
 
 // ─── Sidebar variants (Framer Motion) ─────────────────────────────────────
 const sidebarVariants = {
-  collapsed: { width: 64  },
-  expanded:  { width: 280 },
+  collapsed: { width: 64 },
+  expanded: { width: 280 },
 }
 
 const itemVariants = {
-  collapsed: { opacity: 0, x: -8  },
-  expanded:  { opacity: 1, x:  0  },
+  collapsed: { opacity: 0, x: -8 },
+  expanded: { opacity: 1, x: 0 },
 }
 
 // ─── Component ─────────────────────────────────────────────────────────────
 export default function Sidebar() {
-  const [isHovered, setIsHovered]   = useState(false)
-  const unresolvedAlerts            = useDashboardStore((s) => s.overview?.unresolvedAlerts)
-  const { theme, toggleTheme }      = useThemeStore()
+  const [isHovered, setIsHovered] = useState(false)
+  const unresolvedAlerts = useDashboardStore((s) => s.overview?.unresolvedAlerts)
+  const { theme, toggleTheme } = useThemeStore()
 
   return (
     <motion.aside
@@ -98,11 +98,10 @@ function ExpandedSidebar({ unresolvedAlerts, theme, toggleTheme }) {
               <NavLink to={item.to} end={item.end}>
                 {({ isActive }) => (
                   <div
-                    className={`relative flex items-center gap-3 h-10 px-3 rounded-xl transition-all duration-150 cursor-pointer select-none ${
-                      isActive
+                    className={`relative flex items-center gap-3 h-10 px-3 rounded-xl transition-all duration-150 cursor-pointer select-none ${isActive
                         ? "bg-primary/10 text-primary shadow-sm border-r-2 border-primary"
                         : "text-sidebar-foreground/60 hover:bg-sidebar-accent hover:text-sidebar-foreground"
-                    }`}
+                      }`}
                   >
                     <item.icon className="h-[18px] w-[18px] shrink-0" />
                     <span className="text-sm font-medium flex-1 truncate">{item.label}</span>
@@ -176,11 +175,10 @@ function CollapsedSidebar({ unresolvedAlerts, theme, toggleTheme }) {
             <NavLink to={item.to} end={item.end} title={item.label}>
               {({ isActive }) => (
                 <div
-                  className={`flex items-center justify-center w-10 h-10 rounded-xl transition-all duration-150 ${
-                    isActive
+                  className={`flex items-center justify-center w-10 h-10 rounded-xl transition-all duration-150 ${isActive
                       ? "bg-primary/10 text-primary shadow-sm"
                       : "text-sidebar-foreground/50 hover:bg-sidebar-accent hover:text-sidebar-foreground"
-                  }`}
+                    }`}
                 >
                   <item.icon className="h-[18px] w-[18px]" />
                 </div>
