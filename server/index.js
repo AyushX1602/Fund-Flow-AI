@@ -129,12 +129,20 @@ app.use(errorHandler);
 // ─────────────────────────────────────────────
 // Start Server
 // ─────────────────────────────────────────────
-server.listen(config.port, () => {
+server.listen(config.port, async () => {
   logger.info(`🚀 FundFlow AI server running on http://localhost:${config.port}`);
   logger.info(`📡 Socket.io ready on ws://localhost:${config.port}`);
   logger.info(`📋 API docs: http://localhost:${config.port}/api/health`);
   if (config.demo.enabled) {
     logger.info("🎮 DEMO MODE is enabled — auth bypass active");
+  }
+
+  // Warm up Ollama (preload model into GPU VRAM so first Ask AI call is fast)
+  try {
+    const { warmupOllama } = require("./services/llmService");
+    await warmupOllama();
+  } catch (err) {
+    logger.warn("Ollama warmup skipped:", err.message);
   }
 });
 

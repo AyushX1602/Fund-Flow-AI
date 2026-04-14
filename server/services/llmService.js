@@ -1,33 +1,48 @@
 /**
- * llmService.js — Gemini LLM "Third Brain" for Fraud Reasoning
+ * llmService.js — Dual-Brain LLM Service
  *
- * ONLY called for uncertain transactions (effectiveScore 0.35–0.75).
- * Clear fraud (>0.75) and clear safe (<0.35) don't need LLM reasoning.
+ * Supports two LLM providers:
+ *   1. Ollama  (local, no rate limits, offline, RTX 4050 6GB friendly)
+ *   2. Gemini  (cloud, free tier: ~15 RPM)
  *
- * Rate limit protection (free tier: ~15 RPM):
- *   1. Score gating     — only uncertain zone triggers a call
- *   2. In-memory cache  — same sender account reused for 10 minutes
- *   3. Request queue    — enforces min 4s gap between calls (~15/min max)
- *   4. Timeout          — 8s hard limit, returns null on timeout (no crash)
- *   5. Graceful fallback— if API key missing or quota hit, returns null silently
+ * Set LLM_PROVIDER in .env:
+ *   LLM_PROVIDER=ollama   → use Ollama only
+ *   LLM_PROVIDER=gemini   → use Gemini only
+ *   LLM_PROVIDER=auto     → try Ollama first, fall back to Gemini (default)
+ *
+ * Ollama setup:
+ *   1. Install: https://ollama.com/download/windows
+ *   2. Pull model: ollama pull mistral:7b-instruct  (4GB, fits RTX 4050 6GB)
+ *      Or lighter: ollama pull llama3.2:3b           (2GB, faster)
  */
 
 const { GoogleGenerativeAI } = require("@google/generative-ai");
+const axios = require("axios");
 const logger = require("../utils/logger");
 
-// ─── Config ───────────────────────────────────────────────────────────────
-const UNCERTAIN_MIN = 0.35;
-const UNCERTAIN_MAX = 0.75;
-const CACHE_TTL_MS  = 30 * 60 * 1000;  // 30 min cache (halves quota usage)
-const MIN_GAP_MS    = 4000;            // 4s between calls = max 15/min (exact free-tier limit)
-const CALL_TIMEOUT  = 25000;           // 25s — generous timeout
-const MAX_DAILY     = 100;            // Raised cap — gemini free tier allows 1500 RPD
+// ─── Config ──────────────────────────────────────────────────────────────────
+const UNCERTAIN_MIN   = 0.35;
+const UNCERTAIN_MAX   = 0.75;
+const CACHE_TTL_MS    = 30 * 60 * 1000; // 30 min cache
+const MIN_GAP_MS      = 4000;           // 4s between Gemini calls (15 RPM)
+const GEMINI_TIMEOUT  = 25000;          // 25s for Gemini cloud
+const OLLAMA_TIMEOUT  = 90000;          // 90s for Ollama (cold start loads model into VRAM)
+const MAX_DAILY       = 100;            // Gemini daily cap
 
-// ─── State ────────────────────────────────────────────────────────────────
-let genAI = null;
-let model = null;
-let lastCallTime = 0;
+// Ollama config
+const OLLAMA_URL      = process.env.OLLAMA_URL      || "http://localhost:11434";
+const OLLAMA_MODEL    = process.env.OLLAMA_MODEL    || "mistral:7b-instruct";
+const LLM_PROVIDER    = process.env.LLM_PROVIDER    || "auto"; // ollama | gemini | auto
+
+// Gemini model
+const GEMINI_MODEL    = process.env.GEMINI_MODEL    || "gemini-2.5-flash-preview-04-17";
+
+// ─── State ────────────────────────────────────────────────────────────────────
+let geminiModel   = null;
+let lastCallTime  = 0;
 let dailyCallCount = 0;
+let ollamaWarmedUp = false;
+
 function getNextMidnight() {
   const d = new Date();
   d.setHours(24, 0, 0, 0);
@@ -35,114 +50,125 @@ function getNextMidnight() {
 }
 let dailyResetAt = getNextMidnight();
 
-// In-memory cache: senderAccountId → { result, expiresAt }
 const analysisCache = new Map();
 
-// ─── Init ─────────────────────────────────────────────────────────────────
-function getModel() {
-  if (model) return model;
+// ─── Gemini Init ─────────────────────────────────────────────────────────────
+function getGeminiModel() {
+  if (geminiModel) return geminiModel;
   const apiKey = process.env.GEMINI_API_KEY;
-  if (!apiKey || apiKey === "your_gemini_api_key_here") {
-    return null;
-  }
-  genAI = new GoogleGenerativeAI(apiKey);
-  // gemini-1.5-flash: higher RPD quota than 2.0-flash on free tier
-  model = genAI.getGenerativeModel({ model: "gemini-2.5-flash-preview-04-17" });
-  logger.info("Gemini LLM service initialized (gemini-1.5-flash)");
-  return model;
+  if (!apiKey || apiKey === "your_gemini_api_key_here") return null;
+  const genAI = new GoogleGenerativeAI(apiKey);
+  geminiModel = genAI.getGenerativeModel({ model: GEMINI_MODEL });
+  logger.info(`Gemini LLM initialized (${GEMINI_MODEL})`);
+  return geminiModel;
 }
 
-/**
- * Main entry: analyse a suspicious transaction with Gemini.
- * Returns null silently if: API key missing, quota hit, timeout, or score out of uncertain range.
- *
- * @param {Object} transaction   - Scored transaction from DB
- * @param {Object} senderAccount - Sender account info
- * @param {Object} mlResult      - { fraudScore, reasons[] }
- * @param {Object} riskProfile   - { compositeScore, layers, dominantLayer }
- * @returns {Object|null}        - { verdict, confidence, reasoning, flags[] } or null
- */
-async function analyseTransaction(transaction, senderAccount, mlResult, riskProfile) {
-  const effectiveScore = riskProfile
-    ? Math.max(mlResult.fraudScore, riskProfile.compositeScore)
-    : mlResult.fraudScore;
-
-  // ── Gate 1: Only uncertain zone ────────────────────────────────────────
-  if (effectiveScore < UNCERTAIN_MIN || effectiveScore > UNCERTAIN_MAX) {
-    return null;
+// ─── Ollama Availability Check ────────────────────────────────────────────────
+async function isOllamaRunning() {
+  try {
+    const res = await axios.get(`${OLLAMA_URL}/api/tags`, { timeout: 2000 });
+    const models = res.data?.models || [];
+    const available = models.some(m => m.name?.startsWith(OLLAMA_MODEL.split(":")[0]));
+    return available;
+  } catch {
+    return false;
   }
+}
 
-  // ── Gate 2: Daily quota guard ──────────────────────────────────────────
-  if (Date.now() > dailyResetAt) {
-    dailyCallCount = 0;
-    dailyResetAt = getNextMidnight();
-  }
-  if (dailyCallCount >= MAX_DAILY) {
-    logger.warn(`Gemini daily cap (${MAX_DAILY}) reached — skipping LLM analysis`);
-    return null;
-  }
+// ─── Ollama Call ──────────────────────────────────────────────────────────────
+async function callOllama(prompt) {
+  const timeout = ollamaWarmedUp ? 60000 : OLLAMA_TIMEOUT; // 60s normal, 90s cold start
+  const res = await axios.post(
+    `${OLLAMA_URL}/api/generate`,
+    {
+      model: OLLAMA_MODEL,
+      prompt,
+      stream: false,
+      options: { temperature: 0.1, num_predict: 400 },
+    },
+    { timeout }
+  );
+  ollamaWarmedUp = true;
+  return res.data?.response || "";
+}
 
-  // ── Gate 2: Cache check ────────────────────────────────────────────────
-  const cacheKey = `${senderAccount.id}`;
-  const cached = analysisCache.get(cacheKey);
-  if (cached && cached.expiresAt > Date.now()) {
-    logger.debug(`LLM cache hit for account ${senderAccount.id}`);
-    return { ...cached.result, fromCache: true };
+// ─── Ollama Warmup (preload model into VRAM on server start) ─────────────────
+async function warmupOllama() {
+  if (LLM_PROVIDER !== "ollama" && LLM_PROVIDER !== "auto") return;
+  const running = await isOllamaRunning();
+  if (!running) {
+    logger.info("Ollama not running — skipping warmup");
+    return;
   }
-
-  // ── Gate 3: Model available ────────────────────────────────────────────
-  const llmModel = getModel();
-  if (!llmModel) {
-    logger.debug("Gemini API key not configured — skipping LLM analysis");
-    return null;
+  logger.info(`Warming up Ollama (${OLLAMA_MODEL}) — loading model into VRAM...`);
+  try {
+    const start = Date.now();
+    await axios.post(
+      `${OLLAMA_URL}/api/generate`,
+      { model: OLLAMA_MODEL, prompt: "Reply OK", stream: false, options: { num_predict: 5 } },
+      { timeout: OLLAMA_TIMEOUT }
+    );
+    ollamaWarmedUp = true;
+    logger.info(`Ollama warmup complete in ${((Date.now() - start) / 1000).toFixed(1)}s — model loaded into VRAM`);
+  } catch (err) {
+    logger.warn(`Ollama warmup failed: ${err.message}`);
   }
+}
 
-  // ── Gate 4: Rate limit (min 4s between calls) ─────────────────────────
+// ─── Gemini Call ──────────────────────────────────────────────────────────────
+async function callGemini(prompt) {
+  // Rate limit guard
+  if (Date.now() > dailyResetAt) { dailyCallCount = 0; dailyResetAt = getNextMidnight(); }
+  if (dailyCallCount >= MAX_DAILY) throw new Error("QUOTA_EXHAUSTED");
+
   const now = Date.now();
   const waitMs = Math.max(0, MIN_GAP_MS - (now - lastCallTime));
-  if (waitMs > 0) {
-    await new Promise(r => setTimeout(r, waitMs));
-  }
+  if (waitMs > 0) await new Promise(r => setTimeout(r, waitMs));
   lastCallTime = Date.now();
 
-  // ── Build prompt ───────────────────────────────────────────────────────
-  const prompt = buildPrompt(transaction, senderAccount, mlResult, riskProfile, effectiveScore);
+  const model = getGeminiModel();
+  if (!model) throw new Error("GEMINI_NOT_CONFIGURED");
 
-  try {
-    logger.info(`Gemini LLM analysis for txn ${transaction.transactionId} (score: ${effectiveScore}, daily: ${dailyCallCount + 1}/${MAX_DAILY})`);
-    dailyCallCount++;
-
-    // Hard timeout wrapper
-    const result = await Promise.race([
-      llmModel.generateContent(prompt),
-      new Promise((_, reject) =>
-        setTimeout(() => reject(new Error("LLM timeout")), CALL_TIMEOUT)
-      ),
-    ]);
-
-    const text = result.response.text();
-    const parsed = parseGeminiResponse(text);
-
-    // Cache by sender account
-    analysisCache.set(cacheKey, {
-      result: parsed,
-      expiresAt: Date.now() + CACHE_TTL_MS,
-    });
-
-    return parsed;
-  } catch (err) {
-    if (err.message === "LLM timeout") {
-      logger.warn(`Gemini timeout for txn ${transaction.transactionId}`);
-    } else if (err.message?.includes("429") || err.message?.includes("quota")) {
-      logger.warn("Gemini rate limit hit — will retry after cache expires");
-    } else {
-      logger.error("Gemini LLM error", { error: err.message });
-    }
-    return null; // Always fail gracefully — never crash the pipeline
-  }
+  const result = await Promise.race([
+    model.generateContent(prompt),
+    new Promise((_, reject) => setTimeout(() => reject(new Error("LLM timeout")), GEMINI_TIMEOUT)),
+  ]);
+  dailyCallCount++;
+  return result.response.text();
 }
 
-// ─── Prompt Builder ────────────────────────────────────────────────────────
+// ─── Smart Router ─────────────────────────────────────────────────────────────
+async function callLLM(prompt, context = "auto") {
+  const provider = context === "force" ? LLM_PROVIDER : LLM_PROVIDER;
+
+  if (provider === "ollama") {
+    const text = await callOllama(prompt);
+    return { text, model: OLLAMA_MODEL, provider: "ollama" };
+  }
+
+  if (provider === "gemini") {
+    const text = await callGemini(prompt);
+    return { text, model: GEMINI_MODEL, provider: "gemini" };
+  }
+
+  // "auto" — try Ollama first, fall back to Gemini
+  const ollamaUp = await isOllamaRunning();
+  if (ollamaUp) {
+    try {
+      logger.info(`Using Ollama (${OLLAMA_MODEL}) for LLM analysis`);
+      const text = await callOllama(prompt);
+      return { text, model: OLLAMA_MODEL, provider: "ollama" };
+    } catch (err) {
+      logger.warn(`Ollama failed (${err.message}), falling back to Gemini`);
+    }
+  }
+
+  logger.info(`Using Gemini (${GEMINI_MODEL}) for LLM analysis`);
+  const text = await callGemini(prompt);
+  return { text, model: GEMINI_MODEL, provider: "gemini" };
+}
+
+// ─── Prompt Builder ───────────────────────────────────────────────────────────
 function buildPrompt(transaction, senderAccount, mlResult, riskProfile, effectiveScore) {
   const topReasons = (mlResult.reasons || [])
     .slice(0, 3)
@@ -173,100 +199,88 @@ SENDER ACCOUNT:
 FRAUD SIGNALS:
 - ML Model Score: ${mlResult.fraudScore.toFixed(3)}
 - 6-Layer Composite: ${riskProfile?.compositeScore?.toFixed(3) || "N/A"}
-- Effective Score: ${effectiveScore.toFixed(3)} (UNCERTAIN ZONE — needs LLM reasoning)
+- Effective Score: ${effectiveScore.toFixed(3)} (needs LLM reasoning)
 - Dominant Risk Layer: ${riskProfile?.dominantLayer || "ml"}
 - Layer Breakdown: ${layerSummary}
 
 TOP ML REASONS:
 ${topReasons || "- No specific reasons flagged"}
 
-TASK: This transaction is in the uncertain zone (score ${effectiveScore.toFixed(2)}). The automated systems are not confident. Provide:
-1. VERDICT: SUSPICIOUS or MONITOR or CLEAR (one word)
-2. CONFIDENCE: 0.0 to 1.0
-3. REASONING: 2-3 sentences max explaining why in plain English
-4. FLAGS: up to 3 specific red flags or green flags
-
-Respond ONLY in this exact JSON format:
+TASK: Provide your fraud verdict. Respond ONLY in this exact JSON format, no other text:
 {
   "verdict": "SUSPICIOUS",
   "confidence": 0.72,
-  "reasoning": "Your reasoning here.",
+  "reasoning": "Your 2-3 sentence reasoning here.",
   "flags": ["flag1", "flag2", "flag3"]
-}`;
+}
+Valid verdicts: SUSPICIOUS, MONITOR, CLEAR`;
 }
 
-// ─── Response Parser ───────────────────────────────────────────────────────
-function parseGeminiResponse(text) {
+// ─── Response Parser ──────────────────────────────────────────────────────────
+function parseLLMResponse(text, modelName) {
   try {
-    // Extract JSON from response (Gemini sometimes wraps in markdown)
     const jsonMatch = text.match(/\{[\s\S]*\}/);
     if (!jsonMatch) throw new Error("No JSON in response");
-
     const parsed = JSON.parse(jsonMatch[0]);
-
     return {
-      verdict:    parsed.verdict    || "MONITOR",
-      confidence: parseFloat(parsed.confidence) || 0.5,
-      reasoning:  parsed.reasoning  || "LLM analysis inconclusive.",
+      verdict:    ["SUSPICIOUS", "MONITOR", "CLEAR"].includes(parsed.verdict) ? parsed.verdict : "MONITOR",
+      confidence: Math.min(1, Math.max(0, parseFloat(parsed.confidence) || 0.5)),
+      reasoning:  parsed.reasoning || "LLM analysis inconclusive.",
       flags:      Array.isArray(parsed.flags) ? parsed.flags.slice(0, 3) : [],
       fromCache:  false,
-      model:      "gemini-2.5-flash-preview-04-17",
+      model:      modelName,
     };
   } catch {
-    // If Gemini returns unstructured text, extract what we can
     return {
-      verdict:    "MONITOR",
+      verdict:   "MONITOR",
       confidence: 0.5,
       reasoning:  text.slice(0, 300),
       flags:      [],
       fromCache:  false,
-      model:      "gemini-2.5-flash-preview-04-17",
+      model:      modelName,
     };
   }
 }
 
-/**
- * Force-analyse a transaction with Gemini (bypass score gating).
- * Used by the Investigation review queue for on-demand human-triggered analysis.
- * Still respects daily quota and rate limits.
- *
- * @param {Object} transaction   - Full transaction from DB (with accounts)
- * @param {Object} senderAccount
- * @param {Object} mlResult      - { fraudScore, reasons[] }
- * @param {Object} riskProfile   - { compositeScore, layers, dominantLayer }
- * @returns {Object|null}
- */
-async function forceAnalyse(transaction, senderAccount, mlResult, riskProfile) {
-  // ── Gate: Daily quota guard ────────────────────────────────────────────
-  if (Date.now() > dailyResetAt) {
-    dailyCallCount = 0;
-    dailyResetAt = getNextMidnight();
-  }
-  if (dailyCallCount >= MAX_DAILY) {
-    logger.warn(`Gemini daily cap (${MAX_DAILY}) reached — skipping forced analysis`);
-    return { verdict: "QUOTA_EXHAUSTED", confidence: 0, reasoning: `Gemini daily quota (${MAX_DAILY} calls) exhausted. Resets at midnight.`, flags: [], model: "gemini-2.5-flash-preview-04-17" };
-  }
+// ─── Error Result Builder ─────────────────────────────────────────────────────
+function errorResult(verdict, message, model = "unknown") {
+  return { verdict, confidence: 0, reasoning: message, flags: [], fromCache: false, model };
+}
 
-  // ── Cache check ────────────────────────────────────────────────────────
-  const cacheKey = `force_${transaction.id}`;
+// ─── Main Entry: analyseTransaction ──────────────────────────────────────────
+async function analyseTransaction(transaction, senderAccount, mlResult, riskProfile) {
+  const effectiveScore = riskProfile
+    ? Math.max(mlResult.fraudScore, riskProfile.compositeScore)
+    : mlResult.fraudScore;
+
+  if (effectiveScore < UNCERTAIN_MIN || effectiveScore > UNCERTAIN_MAX) return null;
+
+  const cacheKey = `txn_${senderAccount.id}`;
   const cached = analysisCache.get(cacheKey);
   if (cached && cached.expiresAt > Date.now()) {
     return { ...cached.result, fromCache: true };
   }
 
-  // ── Model available ────────────────────────────────────────────────────
-  const llmModel = getModel();
-  if (!llmModel) {
-    return { verdict: "UNAVAILABLE", confidence: 0, reasoning: "Gemini API key not configured. Add GEMINI_API_KEY to .env.", flags: [], model: "gemini-2.5-flash-preview-04-17" };
-  }
+  const prompt = buildPrompt(transaction, senderAccount, mlResult, riskProfile, effectiveScore);
 
-  // ── Rate limit ─────────────────────────────────────────────────────────
-  const now = Date.now();
-  const waitMs = Math.max(0, MIN_GAP_MS - (now - lastCallTime));
-  if (waitMs > 0) {
-    await new Promise(r => setTimeout(r, waitMs));
+  try {
+    const { text, model } = await callLLM(prompt);
+    const result = parseLLMResponse(text, model);
+    analysisCache.set(cacheKey, { result, expiresAt: Date.now() + CACHE_TTL_MS });
+    return result;
+  } catch (err) {
+    logger.error("LLM analyseTransaction error", { error: err.message });
+    return null;
   }
-  lastCallTime = Date.now();
+}
+
+// ─── Force Analyse (on-demand, bypass score gating) ──────────────────────────
+async function forceAnalyse(transaction, senderAccount, mlResult, riskProfile) {
+  const cacheKey = `force_${transaction.id}`;
+  const cached = analysisCache.get(cacheKey);
+  if (cached && cached.expiresAt > Date.now()) {
+    return { ...cached.result, fromCache: true };
+  }
 
   const effectiveScore = riskProfile
     ? Math.max(mlResult.fraudScore, riskProfile.compositeScore)
@@ -275,53 +289,42 @@ async function forceAnalyse(transaction, senderAccount, mlResult, riskProfile) {
   const prompt = buildPrompt(transaction, senderAccount, mlResult, riskProfile, effectiveScore);
 
   try {
-    logger.info(`Gemini FORCED analysis for txn ${transaction.transactionId} (score: ${effectiveScore}, daily: ${dailyCallCount + 1}/${MAX_DAILY})`);
-    dailyCallCount++;
-
-    const result = await Promise.race([
-      llmModel.generateContent(prompt),
-      new Promise((_, reject) =>
-        setTimeout(() => reject(new Error("LLM timeout")), CALL_TIMEOUT)
-      ),
-    ]);
-
-    const text = result.response.text();
-    const parsed = parseGeminiResponse(text);
-
-    // Cache by transaction ID
-    analysisCache.set(cacheKey, {
-      result: parsed,
-      expiresAt: Date.now() + CACHE_TTL_MS,
-    });
-
-    return parsed;
+    logger.info(`Forced LLM analysis for txn ${transaction.transactionId} (provider: ${LLM_PROVIDER})`);
+    const { text, model, provider } = await callLLM(prompt, "force");
+    const result = parseLLMResponse(text, model);
+    logger.info(`LLM result: ${result.verdict} (${provider})`);
+    analysisCache.set(cacheKey, { result, expiresAt: Date.now() + CACHE_TTL_MS });
+    return result;
   } catch (err) {
-    if (err.message === "LLM timeout") {
-      logger.warn(`Gemini timeout for forced analysis txn ${transaction.transactionId}`);
-      return { verdict: "TIMEOUT", confidence: 0, reasoning: "Gemini API timed out after 20 seconds. Try again.", flags: [], model: "gemini-2.5-flash-preview-04-17" };
-    } else if (err.message?.includes("429") || err.message?.includes("quota")) {
-      logger.warn("Gemini rate limit on forced analysis");
-      return { verdict: "RATE_LIMITED", confidence: 0, reasoning: "Gemini API rate limit hit (free tier: ~15 RPM). Wait 60 seconds.", flags: [], model: "gemini-2.5-flash-preview-04-17" };
+    const msg = err.message || "Unknown error";
+    logger.error("LLM forceAnalyse error", { error: msg });
+
+    if (msg === "QUOTA_EXHAUSTED") {
+      return errorResult("QUOTA_EXHAUSTED", `Daily AI quota (${MAX_DAILY} calls) exhausted. Resets at midnight.`, GEMINI_MODEL);
     }
-    logger.error("Gemini forced analysis error", { error: err.message });
-    return { verdict: "ERROR", confidence: 0, reasoning: err.message || "Unknown error", flags: [], model: "gemini-2.5-flash-preview-04-17" };
+    if (msg === "LLM timeout") {
+      return errorResult("TIMEOUT", "AI service timed out. Try again in a moment.", LLM_PROVIDER);
+    }
+    if (msg.includes("429") || msg.includes("quota") || msg.includes("RATE_LIMITED")) {
+      return errorResult("RATE_LIMITED", "Rate limit reached. Wait ~60 seconds and retry.", GEMINI_MODEL);
+    }
+    if (msg === "GEMINI_NOT_CONFIGURED") {
+      return errorResult("UNAVAILABLE", "No LLM configured. Install Ollama or add GEMINI_API_KEY to .env.", "none");
+    }
+    return errorResult("ERROR", msg, LLM_PROVIDER);
   }
 }
 
-/**
- * Check if LLM service is configured and available.
- */
+// ─── Utilities ────────────────────────────────────────────────────────────────
 function isLLMAvailable() {
-  const key = process.env.GEMINI_API_KEY;
-  return !!(key && key !== "your_gemini_api_key_here");
+  const geminiKey = process.env.GEMINI_API_KEY;
+  const hasGemini = !!(geminiKey && geminiKey !== "your_gemini_api_key_here");
+  // Ollama availability is checked at runtime — assume available if provider is set to ollama
+  return hasGemini || LLM_PROVIDER === "ollama" || LLM_PROVIDER === "auto";
 }
 
-/**
- * Clear the analysis cache (useful for testing).
- */
 function clearCache() {
   analysisCache.clear();
 }
 
-module.exports = { analyseTransaction, forceAnalyse, isLLMAvailable, clearCache };
-
+module.exports = { analyseTransaction, forceAnalyse, isLLMAvailable, clearCache, warmupOllama };
