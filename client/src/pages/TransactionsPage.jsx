@@ -49,12 +49,12 @@ function ShapBars({ reasons }) {
   if (!reasons || reasons.length === 0) return null;
   const maxImpact = Math.max(...reasons.map((r) => r.impact || 0), 0.3);
   return (
-    <div className="space-y-2">
+    <div className="space-y-3 pr-2">
       {reasons.map((r, i) => (
         <div key={i}>
           <div className="flex items-center justify-between text-xs mb-1">
-            <span className="text-muted-foreground truncate">{getShapLabel(r.feature || r.reason)}</span>
-            <span className="font-mono-data font-medium">+{(r.impact || 0).toFixed(2)}</span>
+            <span className="text-muted-foreground truncate mr-4">{getShapLabel(r.feature || r.reason)}</span>
+            <span className="font-mono-data font-medium shrink-0">+{(r.impact || 0).toFixed(2)}</span>
           </div>
           <div className="h-2 rounded-full bg-muted">
             <div
