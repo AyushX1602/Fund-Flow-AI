@@ -34,7 +34,7 @@ function exportToCSV(filename, rows) {
       }).join(separator);
     }).join('\n');
 
-  const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+  const blob = new Blob(['\ufeff' + csvContent], { type: 'text/csv;charset=utf-8;' });
   const url = URL.createObjectURL(blob);
   const link = document.createElement('a');
   link.setAttribute('href', url);
@@ -232,25 +232,37 @@ export default function TransactionsPage() {
               <SelectItem value="RTGS">RTGS</SelectItem>
             </SelectContent>
           </Select>
-          <Button variant="outline" onClick={() => {
-            if (!transactions.length) return;
-            const csvData = transactions.map(t => ({
-              ID: t.transactionId,
-              Amount: t.amount,
-              Type: t.type,
-              Channel: t.channel,
-              Sender: t.senderAccount?.accountHolder || "",
-              SenderBank: t.senderAccount?.bankName || "",
-              Receiver: t.receiverAccount?.accountHolder || "",
-              ReceiverBank: t.receiverAccount?.bankName || "",
-              Timestamp: new Date(t.timestamp).toLocaleString(),
-              FraudScore: t.fraudScore,
-              Status: t.status,
-              Remarks: t.description || ""
-            }));
-            exportToCSV("transactions_all.csv", csvData);
+          <Button variant="outline" disabled={loading} onClick={async () => {
+            try {
+              const params = { limit: 'all' };
+              if (typeFilter !== "ALL") params.type = typeFilter;
+              if (search) params.search = search;
+              
+              const res = await api.get('/transactions', { params });
+              const allTxns = res.data || [];
+              
+              if (!allTxns.length) return;
+              
+              const csvData = allTxns.map(t => ({
+                ID: t.transactionId,
+                Amount: t.amount,
+                Type: t.type,
+                Channel: t.channel,
+                Sender: t.senderAccount?.accountHolder || "",
+                SenderBank: t.senderAccount?.bankName || "",
+                Receiver: t.receiverAccount?.accountHolder || "",
+                ReceiverBank: t.receiverAccount?.bankName || "",
+                Timestamp: new Date(t.timestamp).toLocaleString(),
+                FraudScore: t.fraudScore,
+                Status: t.status,
+                Remarks: t.description || ""
+              }));
+              exportToCSV("transactions_all.csv", csvData);
+            } catch (err) {
+              console.error("Failed to export all transactions:", err);
+            }
           }}>
-            <Download className="mr-2 h-4 w-4" /> Export CSV
+            <Download className="mr-2 h-4 w-4" /> {loading ? "Loading..." : "Export CSV"}
           </Button>
         </div>
 

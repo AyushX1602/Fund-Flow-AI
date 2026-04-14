@@ -40,6 +40,9 @@ function generateChainId() {
  * Parse pagination params from query string.
  */
 function parsePagination(query) {
+  if (query.limit === "all") {
+    return { page: 1, limit: undefined, skip: undefined };
+  }
   const page = Math.max(1, parseInt(query.page, 10) || 1);
   const limit = Math.min(100, Math.max(1, parseInt(query.limit, 10) || 20));
   const skip = (page - 1) * limit;
