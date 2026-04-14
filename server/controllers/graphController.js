@@ -16,72 +16,73 @@ function setSocketIO(socketIO) {
 async function getFundFlow(req, res, next) {
   try {
     const { accountId } = req.params;
-    const maxHops = parseInt(req.query.hops, 10) || 3;
-    const direction = req.query.direction || "outgoing"; // outgoing | incoming | both
+    const maxHops = Math.min(parseInt(req.query.hops, 10) || 2, 3); // Cap at 3 hops
+    const direction = req.query.direction || "both";
 
     const account = await prisma.account.findUnique({ where: { id: accountId } });
     if (!account) throw ApiError.notFound("Account not found");
 
-    // BFS to trace fund flow
-    const visited = new Set();
-    const nodes = [];
-    const edges = [];
-    let queue = [{ accountId, hop: 0 }];
+    // ── Optimised BFS: batch-fetch edges per hop level ─────────────────────
+    const visitedNodes = new Set([accountId]);
+    const allEdges = [];
+    let currentFrontier = [accountId]; // Account IDs at current BFS level
 
-    while (queue.length > 0) {
-      const nextQueue = [];
+    for (let hop = 0; hop < maxHops && currentFrontier.length > 0; hop++) {
+      // Build WHERE clause for all frontier accounts at once (batch)
+      const whereClause =
+        direction === "outgoing"  ? { sourceAccountId: { in: currentFrontier } } :
+        direction === "incoming"  ? { targetAccountId: { in: currentFrontier } } :
+        /* both */                  { OR: [{ sourceAccountId: { in: currentFrontier } }, { targetAccountId: { in: currentFrontier } }] };
 
-      for (const { accountId: currentId, hop } of queue) {
-        if (visited.has(currentId) || hop > maxHops) continue;
-        visited.add(currentId);
+      const hopEdges = await prisma.fundFlowEdge.findMany({
+        where: whereClause,
+        include: {
+          sourceAccount: { select: { id: true, accountNumber: true, accountHolder: true, bankName: true, riskScore: true, muleScore: true, isFrozen: true } },
+          targetAccount: { select: { id: true, accountNumber: true, accountHolder: true, bankName: true, riskScore: true, muleScore: true, isFrozen: true } },
+          transaction:   { select: { transactionId: true, amount: true, type: true, fraudScore: true, timestamp: true } },
+        },
+        orderBy: { timestamp: "asc" },
+        take: 50, // Keep graph manageable — frontend aggregates duplicates
+      });
 
-        // Get account info
-        const acc = await prisma.account.findUnique({
-          where: { id: currentId },
-          select: {
-            id: true, accountNumber: true, accountHolder: true, bankName: true,
-            riskScore: true, muleScore: true, isFrozen: true,
-          },
-        });
-        if (acc) nodes.push({ ...acc, hop });
-
-        // Get edges
-        const whereClause = {};
-        if (direction === "outgoing") whereClause.sourceAccountId = currentId;
-        else if (direction === "incoming") whereClause.targetAccountId = currentId;
-        else whereClause.OR = [{ sourceAccountId: currentId }, { targetAccountId: currentId }];
-
-        const flowEdges = await prisma.fundFlowEdge.findMany({
-          where: whereClause,
-          include: {
-            sourceAccount: { select: { id: true, accountNumber: true, accountHolder: true } },
-            targetAccount: { select: { id: true, accountNumber: true, accountHolder: true } },
-            transaction: { select: { transactionId: true, amount: true, type: true, fraudScore: true, timestamp: true } },
-          },
-          orderBy: { timestamp: "asc" },
-          take: 50,
-        });
-
-        for (const edge of flowEdges) {
-          edges.push(edge);
-          const nextAccount = direction === "incoming" ? edge.sourceAccountId : edge.targetAccountId;
-          if (!visited.has(nextAccount)) {
-            nextQueue.push({ accountId: nextAccount, hop: hop + 1 });
-          }
+      const nextFrontier = new Set();
+      for (const edge of hopEdges) {
+        allEdges.push(edge);
+        // Discover new nodes for the next hop
+        if (!visitedNodes.has(edge.sourceAccountId)) {
+          visitedNodes.add(edge.sourceAccountId);
+          nextFrontier.add(edge.sourceAccountId);
+        }
+        if (!visitedNodes.has(edge.targetAccountId)) {
+          visitedNodes.add(edge.targetAccountId);
+          nextFrontier.add(edge.targetAccountId);
         }
       }
-
-      queue = nextQueue;
+      currentFrontier = [...nextFrontier];
     }
+
+    // ── Build nodes from visited set ──────────────────────────────────────
+    // Use accounts we already got from edge includes + root account
+    const nodeMap = new Map();
+    nodeMap.set(account.id, {
+      id: account.id, accountNumber: account.accountNumber, accountHolder: account.accountHolder,
+      bankName: account.bankName, riskScore: account.riskScore, muleScore: account.muleScore, isFrozen: account.isFrozen, hop: 0,
+    });
+    allEdges.forEach((e) => {
+      if (e.sourceAccount && !nodeMap.has(e.sourceAccount.id)) nodeMap.set(e.sourceAccount.id, { ...e.sourceAccount, hop: -1 });
+      if (e.targetAccount && !nodeMap.has(e.targetAccount.id)) nodeMap.set(e.targetAccount.id, { ...e.targetAccount, hop: -1 });
+    });
+
+    const nodes = Array.from(nodeMap.values());
 
     ApiResponse.success({
       rootAccount: accountId,
       maxHops,
       direction,
       nodes,
-      edges,
+      edges: allEdges,
       totalNodes: nodes.length,
-      totalEdges: edges.length,
+      totalEdges: allEdges.length,
     }).send(res);
   } catch (error) {
     next(error);
