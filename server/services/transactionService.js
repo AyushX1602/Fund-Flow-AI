@@ -27,14 +27,19 @@ function setSocketIO(socketIO) {
  *
  * @param {Object} data - Transaction data from API
  * @param {string} [userId] - User who triggered (for audit)
+ * @param {Object} [opts] - Options for performance tuning
+ * @param {Object} [opts.senderAccount] - Pre-fetched sender account (skips DB lookup)
+ * @param {Object} [opts.receiverAccount] - Pre-fetched receiver account (skips DB lookup)
+ * @param {boolean} [opts.skipAccountRiskUpdate] - Skip per-txn account risk recalc (batch later)
+ * @param {boolean} [opts.skipLLM] - Skip Gemini LLM analysis (for bulk/simulation)
  * @returns {Object} Created transaction with ML results
  */
-async function processTransaction(data, userId = null) {
-  // Fetch sender & receiver accounts
-  const senderAccount = await prisma.account.findUnique({
+async function processTransaction(data, userId = null, opts = {}) {
+  // Fetch sender & receiver accounts (skip if pre-supplied)
+  const senderAccount = opts.senderAccount || await prisma.account.findUnique({
     where: { id: data.senderAccountId },
   });
-  const receiverAccount = await prisma.account.findUnique({
+  const receiverAccount = opts.receiverAccount || await prisma.account.findUnique({
     where: { id: data.receiverAccountId },
   });
 
@@ -94,23 +99,44 @@ async function processTransaction(data, userId = null) {
     });
   }
 
-  // Score transaction via ML service
+  // Score transaction via ML service (rule-based is in-memory, instant)
   const mlResult = await mlService.scoreTransaction(transaction, senderAccount, receiverAccount);
 
-  // Update transaction with ML results
-  const scoredTransaction = await prisma.transaction.update({
-    where: { id: transaction.id },
-    data: {
-      fraudScore: mlResult.fraudScore,
-      isFraud: mlResult.isFraud,
-      mlModelVersion: mlResult.modelVersion,
-      mlReasons: mlResult.reasons,
-    },
-    include: {
-      senderAccount: { select: { id: true, accountNumber: true, accountHolder: true, bankName: true } },
-      receiverAccount: { select: { id: true, accountNumber: true, accountHolder: true, bankName: true } },
-    },
-  });
+  // ── Parallel phase: update txn, create edge, and compute risk layers at once ──
+  const [scoredTransaction, , riskProfile] = await Promise.all([
+    // 1. Update transaction with ML results
+    prisma.transaction.update({
+      where: { id: transaction.id },
+      data: {
+        fraudScore: mlResult.fraudScore,
+        isFraud: mlResult.isFraud,
+        mlModelVersion: mlResult.modelVersion,
+        mlReasons: mlResult.reasons,
+      },
+      include: {
+        senderAccount: { select: { id: true, accountNumber: true, accountHolder: true, bankName: true } },
+        receiverAccount: { select: { id: true, accountNumber: true, accountHolder: true, bankName: true } },
+      },
+    }),
+    // 2. Create FundFlowEdge (no return value needed)
+    prisma.fundFlowEdge.create({
+      data: {
+        chainId: data.chainId || null,
+        sourceAccountId: data.senderAccountId,
+        targetAccountId: data.receiverAccountId,
+        transactionId: transaction.id,
+        amount: transaction.amount,
+        timestamp: transaction.timestamp,
+        riskScore: mlResult.fraudScore,
+      },
+    }),
+    // 3. Compute 6-layer risk (has its own DB queries internally)
+    riskEngine.computeRiskLayers(
+      { ...transaction, fraudScore: mlResult.fraudScore },
+      senderAccount,
+      receiverAccount
+    ),
+  ]);
 
   // Emit scored event
   if (io) {
@@ -123,41 +149,35 @@ async function processTransaction(data, userId = null) {
     });
   }
 
-  // Create FundFlowEdge
-  await prisma.fundFlowEdge.create({
-    data: {
-      chainId: data.chainId || null,
-      sourceAccountId: data.senderAccountId,
-      targetAccountId: data.receiverAccountId,
-      transactionId: transaction.id,
-      amount: transaction.amount,
-      timestamp: transaction.timestamp,
-      riskScore: mlResult.fraudScore,
-    },
-  });
-
-  // Compute 6-layer composite risk score
-  const riskProfile = await riskEngine.computeRiskLayers(scoredTransaction, senderAccount, receiverAccount);
   logger.info(`Risk layers for ${scoredTransaction.transactionId}: composite=${riskProfile.compositeScore} dominant=${riskProfile.dominantLayer}`);
 
   // ── Brain 3: Gemini LLM (only for uncertain zone 0.35-0.75) ────────────
-  const effectiveScore = Math.max(mlResult.fraudScore, riskProfile.compositeScore);
-  const llmAnalysis = await llmService.analyseTransaction(
-    scoredTransaction, senderAccount, mlResult, riskProfile
-  );
-  if (llmAnalysis) {
-    logger.info(`Gemini verdict for ${scoredTransaction.transactionId}: ${llmAnalysis.verdict} (confidence: ${llmAnalysis.confidence})`);
+  let llmAnalysis = null;
+  if (!opts.skipLLM) {
+    const effectiveScore = Math.max(mlResult.fraudScore, riskProfile.compositeScore);
+    llmAnalysis = await llmService.analyseTransaction(
+      scoredTransaction, senderAccount, mlResult, riskProfile
+    );
+    if (llmAnalysis) {
+      logger.info(`Gemini verdict for ${scoredTransaction.transactionId}: ${llmAnalysis.verdict} (confidence: ${llmAnalysis.confidence})`);
+    }
   }
 
   // Auto-generate alert if fraud score OR composite score exceeds threshold
+  const effectiveScore = Math.max(mlResult.fraudScore, riskProfile.compositeScore);
   let alert = null;
   if (mlResult.isFraud || effectiveScore >= config.alertThreshold) {
     alert = await createAlertForTransaction(scoredTransaction, mlResult, riskProfile, llmAnalysis);
   }
 
-  // Update account risk scores
-  await updateAccountRiskScores(senderAccount.id);
-  await updateAccountRiskScores(receiverAccount.id);
+  // Update account risk scores (skip during simulation — batched at end)
+  if (!opts.skipAccountRiskUpdate) {
+    // Run both updates in parallel
+    await Promise.all([
+      updateAccountRiskScores(senderAccount.id),
+      updateAccountRiskScores(receiverAccount.id),
+    ]);
+  }
 
   return { transaction: scoredTransaction, mlResult, riskProfile, llmAnalysis, alert };
 }
@@ -273,6 +293,19 @@ async function updateAccountRiskScores(accountId) {
 }
 
 /**
+ * Batch-update account risk scores for a set of account IDs.
+ * Used after simulation completes to defer expensive per-txn updates.
+ */
+async function batchUpdateAccountRiskScores(accountIds) {
+  const unique = [...new Set(accountIds)];
+  // Process in small batches of 5 to avoid pool saturation
+  for (let i = 0; i < unique.length; i += 5) {
+    const batch = unique.slice(i, i + 5);
+    await Promise.all(batch.map((id) => updateAccountRiskScores(id)));
+  }
+}
+
+/**
  * Derive severity from fraud score.
  */
 function getSeverityFromScore(score) {
@@ -322,5 +355,6 @@ module.exports = {
   processTransaction,
   setSocketIO,
   updateAccountRiskScores,
+  batchUpdateAccountRiskScores,
   getSeverityFromScore,
 };
