@@ -9,12 +9,41 @@ import { Progress } from "@/components/ui/progress";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
-import { ChevronLeft, ChevronRight, Search, ArrowUpDown } from "lucide-react";
+import { ChevronLeft, ChevronRight, Search, ArrowUpDown, Download } from "lucide-react";
 import useTransactionStore from "@/stores/transactionStore";
 import useSimulationStore from "@/stores/simulationStore";
 import { formatINR, formatScore, getRiskColor, formatDateTime, getSeverityVariant } from "@/lib/formatters";
 import { getShapLabel, getImpactColor } from "@/lib/shapLabels";
 import api from "@/lib/api";
+
+function exportToCSV(filename, rows) {
+  if (!rows || !rows.length) return;
+  const separator = ',';
+  const keys = Object.keys(rows[0]);
+  const csvContent =
+    keys.join(separator) +
+    '\n' +
+    rows.map(row => {
+      return keys.map(k => {
+        let cell = row[k] === null || row[k] === undefined ? '' : row[k];
+        cell = cell instanceof Date ? cell.toLocaleString() : String(cell).replace(/"/g, '""');
+        if (cell.search(/("|,|\n)/g) >= 0) {
+          cell = `"${cell}"`;
+        }
+        return cell;
+      }).join(separator);
+    }).join('\n');
+
+  const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.setAttribute('href', url);
+  link.setAttribute('download', filename);
+  link.style.visibility = 'hidden';
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+}
 
 function ShapBars({ reasons }) {
   if (!reasons || reasons.length === 0) return null;
@@ -67,10 +96,31 @@ function TransactionDetail({ txn, onClose }) {
     <Dialog open={!!txn} onOpenChange={onClose}>
       <DialogContent className="max-w-lg">
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            Transaction Detail
-            <Badge variant="outline" className="font-mono-data text-[10px]">{txn.transactionId}</Badge>
-          </DialogTitle>
+          <div className="flex items-center justify-between pr-4">
+            <DialogTitle className="flex items-center gap-2">
+              Transaction Detail
+              <Badge variant="outline" className="font-mono-data text-[10px]">{txn.transactionId}</Badge>
+            </DialogTitle>
+            <Button variant="outline" size="sm" onClick={() => {
+              const csvData = [{
+                ID: txn.transactionId,
+                Amount: txn.amount,
+                Type: txn.type,
+                Channel: txn.channel,
+                Sender: txn.senderAccount?.accountHolder || "",
+                SenderBank: txn.senderAccount?.bankName || "",
+                Receiver: txn.receiverAccount?.accountHolder || "",
+                ReceiverBank: txn.receiverAccount?.bankName || "",
+                Timestamp: new Date(txn.timestamp).toLocaleString(),
+                FraudScore: txn.fraudScore,
+                Status: txn.status,
+                Remarks: txn.description || ""
+              }];
+              exportToCSV(`transaction_${txn.transactionId}.csv`, csvData);
+            }}>
+              <Download className="mr-2 h-4 w-4" /> Export CSV
+            </Button>
+          </div>
           <DialogDescription>Transaction details and ML fraud explanation</DialogDescription>
         </DialogHeader>
         <div className="space-y-4">
@@ -182,6 +232,26 @@ export default function TransactionsPage() {
               <SelectItem value="RTGS">RTGS</SelectItem>
             </SelectContent>
           </Select>
+          <Button variant="outline" onClick={() => {
+            if (!transactions.length) return;
+            const csvData = transactions.map(t => ({
+              ID: t.transactionId,
+              Amount: t.amount,
+              Type: t.type,
+              Channel: t.channel,
+              Sender: t.senderAccount?.accountHolder || "",
+              SenderBank: t.senderAccount?.bankName || "",
+              Receiver: t.receiverAccount?.accountHolder || "",
+              ReceiverBank: t.receiverAccount?.bankName || "",
+              Timestamp: new Date(t.timestamp).toLocaleString(),
+              FraudScore: t.fraudScore,
+              Status: t.status,
+              Remarks: t.description || ""
+            }));
+            exportToCSV("transactions_all.csv", csvData);
+          }}>
+            <Download className="mr-2 h-4 w-4" /> Export CSV
+          </Button>
         </div>
 
         {/* Table */}
