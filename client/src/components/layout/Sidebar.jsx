@@ -15,7 +15,7 @@ import useThemeStore from "@/stores/themeStore"
 
 // ─── Nav items for FundFlow ────────────────────────────────────────────────
 const navItems = [
-  { to: "/", icon: LayoutDashboard, label: "Dashboard", end: true },
+  { to: "/dashboard", icon: LayoutDashboard, label: "Dashboard" },
   { to: "/transactions", icon: ArrowLeftRight, label: "Transactions" },
   { to: "/alerts", icon: ShieldAlert, label: "Alerts", badge: true },
   { to: "/network", icon: Network, label: "Network Graph" },
