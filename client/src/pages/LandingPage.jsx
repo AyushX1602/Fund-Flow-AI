@@ -1,7 +1,7 @@
 import React from 'react';
 import Header from '@/landing_legacy/components/Header';
 import Footer from '@/landing_legacy/components/Footer';
-import SectionAnchorNav from '@/landing_legacy/components/SectionAnchorNav';
+
 import HeroSection from '@/landing_legacy/app/home/components/HeroSection';
 import StatsBar from '@/landing_legacy/app/home/components/StatsBar';
 import FeaturesSection from '@/landing_legacy/app/home/components/FeaturesSection';
@@ -16,7 +16,6 @@ export default function LandingPage() {
     <ThemeProvider>
       <div className="landing-page landing-page-container min-h-screen overflow-x-hidden">
         <Header />
-        <SectionAnchorNav />
         <section id="hero"><HeroSection /></section>
         <section id="stats"><StatsBar /></section>
         <section id="features"><FeaturesSection /></section>
