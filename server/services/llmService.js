@@ -219,7 +219,9 @@ Valid verdicts: SUSPICIOUS, MONITOR, CLEAR`;
 // ─── Response Parser ──────────────────────────────────────────────────────────
 function parseLLMResponse(text, modelName) {
   try {
-    const jsonMatch = text.match(/\{[\s\S]*\}/);
+    // Qwen3 wraps reasoning in <think>...</think> tags — strip them
+    let cleaned = text.replace(/<think>[\s\S]*?<\/think>/g, '').trim();
+    const jsonMatch = cleaned.match(/\{[\s\S]*\}/);
     if (!jsonMatch) throw new Error("No JSON in response");
     const parsed = JSON.parse(jsonMatch[0]);
     return {
