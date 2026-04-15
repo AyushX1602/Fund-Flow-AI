@@ -249,7 +249,7 @@ Fund-Flow-AI/
 
 ## 🤝 Team
 
-Built by **Team FundFlow** for the PSBs Hackathon Series 2026.
+Built by **Team Spirit** for the PSBs Hackathon Series 2026.
 
 ---
 
