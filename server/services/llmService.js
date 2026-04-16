@@ -84,6 +84,7 @@ async function callOllama(prompt) {
       model: OLLAMA_MODEL,
       prompt,
       stream: false,
+      keep_alive: 0, // <-- Instantly unloads from VRAM after completion
       options: { temperature: 0.1, num_predict: 1000 },
     },
     { timeout }
