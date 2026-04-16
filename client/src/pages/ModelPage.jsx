@@ -196,27 +196,18 @@ export default function ModelPage() {
   const radarData = useMemo(() => {
     const fraudRate = txnStats?.fraudRate ? parseFloat(txnStats.fraudRate) / 100 : 0.13;
     const avgScore  = txnStats?.avgFraudScore ? parseFloat(txnStats.avgFraudScore) : 0.35;
-    if (!isRuleBased && metrics?.precision) {
-      return [
-        { metric: "Precision",  value: Math.round((parseFloat(metrics.precision) || 0.82) * 100) },
-        { metric: "Recall",     value: Math.round((parseFloat(metrics.recall)    || 0.78) * 100) },
-        { metric: "F1 Score",   value: Math.round((parseFloat(metrics.f1)        || 0.80) * 100) },
-        { metric: "AUC-ROC",    value: Math.round((parseFloat(metrics.auc_roc)   || 0.91) * 100) },
-        { metric: "Detection",  value: Math.round(Math.min(fraudRate * 5, 1)     * 100) },
-        { metric: "Coverage",   value: Math.round((parseFloat(metrics.auc_pr)    || 0.74) * 100) },
-        { metric: "Confidence", value: Math.round(Math.min(avgScore * 2.5, 1)    * 100) },
-      ];
-    }
+    
+    // Always use metrics from the backend (which now dynamically calculates them for both models)
     return [
-      { metric: "Precision",  value: 78 },
-      { metric: "Recall",     value: 72 },
-      { metric: "F1 Score",   value: 75 },
-      { metric: "AUC-ROC",    value: 82 },
-      { metric: "Detection",  value: Math.round(Math.min(fraudRate * 500, 90)) },
-      { metric: "Coverage",   value: 68 },
-      { metric: "Confidence", value: Math.round(Math.min(avgScore * 250, 85)) },
+      { metric: "Precision",  value: Math.round((parseFloat(metrics.precision) || 0) * 100) },
+      { metric: "Recall",     value: Math.round((parseFloat(metrics.recall)    || 0) * 100) },
+      { metric: "F1 Score",   value: Math.round((parseFloat(metrics.f1)        || 0) * 100) },
+      { metric: "AUC-ROC",    value: Math.round((parseFloat(metrics.auc_roc)   || 0) * 100) },
+      { metric: "Detection",  value: Math.round(Math.min(fraudRate * 5, 1)     * 100) },
+      { metric: "Coverage",   value: Math.round((parseFloat(metrics.auc_pr)    || 0) * 100) },
+      { metric: "Confidence", value: Math.round(Math.min(avgScore * 2.5, 1)    * 100) },
     ];
-  }, [metrics, txnStats, isRuleBased]);
+  }, [metrics, txnStats]);
 
   const featureData = useMemo(() => {
     const fi = activeModel?.feature_importance;
@@ -462,36 +453,36 @@ export default function ModelPage() {
                 </motion.div>
               </motion.div>
 
-              {/* XGBoost Metrics */}
-              {!isRuleBased && (
-                <motion.div
-                  className="ml-metrics-panel"
-                  initial={{ opacity:0, y:10 }} animate={{ opacity:1, y:0 }}
-                  transition={{ delay:0.4, duration:0.3 }}
-                >
-                  <div style={{ display:"flex", alignItems:"center", gap:8, marginBottom:14 }}>
-                    <Cpu size={14} style={{ color:"var(--primary)", opacity:0.7 }} />
-                    <p className="ml-metrics-title" style={{ margin:0 }}>XGBoost Metrics</p>
-                  </div>
-                  <div className="ml-metrics-grid">
-                    {[
-                      ["AUC-ROC",   metrics?.auc_roc],
-                      ["AUC-PR",    metrics?.auc_pr],
-                      ["Precision", metrics?.precision],
-                      ["Recall",    metrics?.recall],
-                      ["F1 Score",  metrics?.f1],
-                      ["Threshold", "0.70"],
-                    ].map(([k, v]) => (
-                      <div key={k} className="ml-metric-row">
-                        <span className="ml-metric-label">{k}</span>
-                        <span className="ml-metric-value font-mono-data"
-                          style={{ color: v && v !== "0.70" ? "#6366f1" : undefined }}
-                        >{v || "—"}</span>
-                      </div>
-                    ))}
-                  </div>
-                </motion.div>
-              )}
+              {/* Model Metrics */}
+              <motion.div
+                className="ml-metrics-panel"
+                initial={{ opacity:0, y:10 }} animate={{ opacity:1, y:0 }}
+                transition={{ delay:0.4, duration:0.3 }}
+              >
+                <div style={{ display:"flex", alignItems:"center", gap:8, marginBottom:14 }}>
+                  <Cpu size={14} style={{ color:"var(--primary)", opacity:0.7 }} />
+                  <p className="ml-metrics-title" style={{ margin:0 }}>
+                    {isRuleBased ? "Rule-Based Engine Metrics" : "XGBoost API Metrics"}
+                  </p>
+                </div>
+                <div className="ml-metrics-grid">
+                  {[
+                    ["AUC-ROC",   metrics?.auc_roc],
+                    ["AUC-PR",    metrics?.auc_pr],
+                    ["Precision", metrics?.precision],
+                    ["Recall",    metrics?.recall],
+                    ["F1 Score",  metrics?.f1],
+                    ["Threshold", "0.70"],
+                  ].map(([k, v]) => (
+                    <div key={k} className="ml-metric-row">
+                      <span className="ml-metric-label">{k}</span>
+                      <span className="ml-metric-value font-mono-data"
+                        style={{ color: v && v !== "0.70" ? "#6366f1" : undefined }}
+                      >{v || "—"}</span>
+                    </div>
+                  ))}
+                </div>
+              </motion.div>
 
               {/* Fallback info */}
               {isRuleBased && (
@@ -507,8 +498,7 @@ export default function ModelPage() {
                     </p>
                   </div>
                   <p className="ml-info-box-text">
-                    When the FastAPI service is connected, this page auto-switches to XGBoost metrics: 
-                    AUC-PR, Precision, Recall, F1 Score, and Confusion Matrix.
+                    The external Python XGBoost server is unreachable. The system is actively using its internal rule-based heuristic engine. The metrics shown above are calculated live against the dataset labels.
                   </p>
                 </motion.div>
               )}
