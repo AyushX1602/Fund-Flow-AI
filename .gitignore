@@ -45,3 +45,7 @@ logs/
 # ── Misc ──
 .cache/
 *.tmp
+
+# ── Local Configs ──
+docker-compose.yml
+server/prisma.config.ts
