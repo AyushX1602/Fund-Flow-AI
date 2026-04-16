@@ -49,3 +49,8 @@ logs/
 # ── Local Configs ──
 docker-compose.yml
 server/prisma.config.ts
+
+# ── Local Files ──
+Fraud_Detection/Fraud_Detection/data/processed/feature_matrix_sample.csv
+Fraud_Detection/Fraud_Detection/models/trainer.py
+Fraud_Detection/Fraud_Detection/models/saved/model_metadata.json

@@ -56,9 +56,17 @@ def train(data_path: str = None, model_dir: str = None, sample_size: int = None)
     else:
         print("       WARNING: No graph features found. Run `python -m features.graph_features` first.")
         print("       Continuing without graph features (22 features only)...")
-    print("       Computing rolling aggregates (vectorised)...")
-    df_feat = engineer_features(df, graph_features=gf)
+    if 'sender_branch' in df.columns and 'step' in df.columns:
+        print("       Computing rolling aggregates (vectorised)...")
+        df_feat = engineer_features(df, graph_features=gf)
+    else:
+        print("       Features appear to be already engineered. Skipping raw engineering...")
+        df_feat = df
+        
     feature_cols = get_feature_columns()
+    
+    # Filter only overlapping columns in case some are missing in the sample
+    feature_cols = [c for c in feature_cols if c in df_feat.columns]
 
     X = df_feat[feature_cols].fillna(0)
     y = df_feat['is_fraud']
