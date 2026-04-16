@@ -302,19 +302,19 @@ def engineer_single(txn: dict, account_history: pd.DataFrame = None,
     features['channel_mobile']   = int(txn.get('channel', '') == 'mobile')
     features['channel_internet'] = int(txn.get('channel', '') == 'internet')
 
-    # New receiver / cross-bank (require history context — default safe values)
-    features['is_new_receiver']   = 1  # Conservative: assume new unless known
+    # New receiver / cross-bank (require history context — default neutral values)
+    features['is_new_receiver']   = 0  # Neutral: don't assume new receiver
     features['is_cross_bank_upi'] = int(
         features['type_UPI'] == 1 and
         _acct_to_bank_id(sender) != _acct_to_bank_id(receiver)
     )
     features['upi_new_recv_risk'] = int(
-        features['type_UPI'] == 1 and amt > 10000
+        features['type_UPI'] == 1 and amt > 50000  # Only flag high-value UPI
     )
 
-    # Aggregate stats
-    features['receiver_total_recv_count']    = 1   # Unknown at real-time
-    features['sender_total_unique_receivers'] = 1  # Unknown at real-time
+    # Aggregate stats — neutral mid-range defaults
+    features['receiver_total_recv_count']    = 10  # Established receiver
+    features['sender_total_unique_receivers'] = 3  # Typical sender pattern
 
     # Rolling (from history if available)
     if account_history is not None and len(account_history) > 0:
@@ -330,12 +330,12 @@ def engineer_single(txn: dict, account_history: pd.DataFrame = None,
         features['time_since_last_txn_min']     = 5.0
     else:
         features['sender_txn_count_1h']        = 1
-        features['sender_txn_count_24h']        = 1
-        features['sender_avg_amount']           = amt
-        features['sender_std_amount']           = 1.0
+        features['sender_txn_count_24h']        = 5    # Neutral: average daily count
+        features['sender_avg_amount']           = 78917.0  # Training data median
+        features['sender_std_amount']           = 60000.0  # Realistic std dev
         features['amount_deviation']            = 0.0
         features['sender_unique_receivers_1h']  = 1
-        features['time_since_last_txn_min']     = 9999.0
+        features['time_since_last_txn_min']     = 60.0  # Neutral: 1 hour ago
 
     features['hour_velocity_ratio'] = min(
         features['sender_txn_count_1h'] / max(features['sender_txn_count_24h'] / 24.0, 0.1),

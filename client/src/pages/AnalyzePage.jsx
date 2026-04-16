@@ -160,7 +160,8 @@ export default function AnalyzePage() {
   const resultRef                     = useRef();
 
   useEffect(() => {
-    api.get("/accounts?limit=50").then(r => setAccounts(r.data || [])).catch(() => {});
+    // API returns { success, data: [...] } — unwrap the envelope
+    api.get("/accounts?limit=50").then(r => setAccounts(r.data?.data || r.data || [])).catch(() => {});
   }, []);
 
   // Apply scenario preset
@@ -208,10 +209,24 @@ export default function AnalyzePage() {
         upiVpaReceiver: form.type === "UPI" ? form.upiVpaReceiver || null : null,
       };
       const res = await api.post("/transactions", payload);
-      const txnId = res.data?.id || res.data?.transactionId;
+      // Response shape: { success, data: { transaction: {id,...}, mlResult, alert } }
+      const responseData = res.data?.data || res.data;
+      const txnData = responseData?.transaction || responseData;
+      const txnId = txnData?.id;
+      console.log("[AnalyzePage] POST response:", res.status, "txnId:", txnId, "keys:", Object.keys(responseData || {}));
+      if (!txnId) {
+        console.error("[AnalyzePage] Full response:", JSON.stringify(res.data).slice(0, 500));
+        throw new Error("Transaction created but ID not returned");
+      }
       // Fetch full transaction with mlReasons
       const full = await api.get(`/transactions/${txnId}`);
-      setResult(full.data);
+      // Pass both the transaction AND mlResult so results panel has all layers
+      const txn = full.data?.data || full.data;
+      // Merge mlResult from create response into the transaction object
+      const mlResult = responseData?.mlResult;
+      if (mlResult && txn) txn.mlResult = mlResult;
+      if (responseData?.alert && txn) txn.alert = responseData.alert;
+      setResult(txn);
       setTimeout(() => resultRef.current?.scrollIntoView({ behavior: "smooth" }), 100);
     } catch (err) {
       setError(err.response?.data?.message || err.message || "Submission failed");
@@ -296,14 +311,18 @@ export default function AnalyzePage() {
   }
 
   // ── Result extraction ──────────────────────────────────────────────────
-  const mlReasons   = result?.mlReasons || {};
-  const mlScore     = mlReasons.mlScore     ?? result?.fraudScore ?? null;
-  const composite   = mlReasons.compositeScore ?? null;
-  const layers      = mlReasons.layers      ?? null;
-  const llm         = mlReasons.llm         ?? null;
-  const effectiveScore = result?.riskScore ?? mlScore ?? 0;
-  const dominantLayer  = mlReasons.dominantLayer ?? null;
-  const reasons        = mlReasons.reasons  ?? [];
+  // mlResult is merged in from the POST response (has layers, llm, compositeScore)
+  // mlReasons is the flat SHAP array stored on the DB transaction
+  const mlResult    = result?.mlResult || {};
+  const mlReasons   = Array.isArray(result?.mlReasons) ? result.mlReasons : [];
+  const mlScore     = mlResult.fraudScore ?? result?.fraudScore ?? null;
+  const composite   = mlResult.compositeScore ?? null;
+  const layers      = mlResult.layers ?? null;
+  const llm         = mlResult.llm ?? null;
+  const effectiveScore = mlScore ?? result?.fraudScore ?? 0;
+  const dominantLayer  = mlResult.dominantLayer ?? null;
+  // reasons: prefer mlResult.reasons (richer), fall back to flat mlReasons array
+  const reasons = mlResult.reasons?.length > 0 ? mlResult.reasons : mlReasons;
   const severity       = result?.alert?.severity ?? (effectiveScore >= 0.75 ? "CRITICAL" : effectiveScore >= 0.5 ? "HIGH" : effectiveScore >= 0.35 ? "MEDIUM" : "LOW");
 
   return (

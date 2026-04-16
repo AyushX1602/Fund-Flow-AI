@@ -26,7 +26,7 @@ const UNCERTAIN_MAX   = 0.75;
 const CACHE_TTL_MS    = 30 * 60 * 1000; // 30 min cache
 const MIN_GAP_MS      = 4000;           // 4s between Gemini calls (15 RPM)
 const GEMINI_TIMEOUT  = 25000;          // 25s for Gemini cloud
-const OLLAMA_TIMEOUT  = 90000;          // 90s for Ollama (cold start loads model into VRAM)
+const OLLAMA_TIMEOUT  = 60000;          // 60s max for Ollama (1 min as requested)
 const MAX_DAILY       = 100;            // Gemini daily cap
 
 // Ollama config
@@ -77,17 +77,17 @@ async function isOllamaRunning() {
 
 // ─── Ollama Call ──────────────────────────────────────────────────────────────
 async function callOllama(prompt) {
-  const timeout = ollamaWarmedUp ? 60000 : OLLAMA_TIMEOUT; // 60s normal, 90s cold start
+  // Always use 60s timeout (model stays in VRAM thanks to keep_alive)
   const res = await axios.post(
     `${OLLAMA_URL}/api/generate`,
     {
       model: OLLAMA_MODEL,
       prompt,
       stream: false,
-      keep_alive: 0, // <-- Instantly unloads from VRAM after completion
+      keep_alive: "5m", // Keep model in VRAM for 5 min of idle — avoids cold starts
       options: { temperature: 0.1, num_predict: 1000 },
     },
-    { timeout }
+    { timeout: OLLAMA_TIMEOUT }
   );
   ollamaWarmedUp = true;
   return res.data?.response || "";
@@ -106,7 +106,7 @@ async function warmupOllama() {
     const start = Date.now();
     await axios.post(
       `${OLLAMA_URL}/api/generate`,
-      { model: OLLAMA_MODEL, prompt: "Reply OK", stream: false, options: { num_predict: 5 } },
+      { model: OLLAMA_MODEL, prompt: "Reply OK", stream: false, keep_alive: "5m", options: { num_predict: 5 } },
       { timeout: OLLAMA_TIMEOUT }
     );
     ollamaWarmedUp = true;

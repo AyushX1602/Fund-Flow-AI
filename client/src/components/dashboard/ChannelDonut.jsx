@@ -119,7 +119,7 @@ export default function ChannelDonut() {
         <div className="flex flex-col sm:flex-row items-center gap-4">
           {/* ─── Donut Chart ─── */}
           <div className="relative shrink-0" style={{ width: 230, height: 230 }}>
-            <ResponsiveContainer width="100%" height="100%">
+            <ResponsiveContainer width={230} height={230}>
               <PieChart>
                 <ReTooltip content={<CustomTooltip />} />
                 <Pie
