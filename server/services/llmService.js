@@ -31,7 +31,7 @@ const MAX_DAILY       = 100;            // Gemini daily cap
 
 // Ollama config
 const OLLAMA_URL      = process.env.OLLAMA_URL      || "http://localhost:11434";
-const OLLAMA_MODEL    = process.env.OLLAMA_MODEL    || "mistral:7b-instruct";
+const OLLAMA_MODEL    = process.env.OLLAMA_MODEL    || "qwen3:8b";
 const LLM_PROVIDER    = process.env.LLM_PROVIDER    || "auto"; // ollama | gemini | auto
 
 // Gemini model
@@ -84,7 +84,7 @@ async function callOllama(prompt) {
       model: OLLAMA_MODEL,
       prompt,
       stream: false,
-      options: { temperature: 0.1, num_predict: 400 },
+      options: { temperature: 0.1, num_predict: 1000 },
     },
     { timeout }
   );
