@@ -41,20 +41,18 @@ async function isFastApiAvailable() {
 
 /**
  * Score a single transaction.
- * Returns: { fraudScore, isFraud, reasons[], modelVersion }
+ * Always uses the rule-based engine for live scoring.
+ *
+ * Why not XGBoost?  The model was trained on PaySim batch data where each
+ * account has hundreds of historical transactions.  In live mode, without
+ * full account history, XGBoost produces inconsistent raw probabilities per
+ * transaction type (UPI→0.94, NEFT→0.85) that can't be calibrated uniformly.
+ * The rule-based engine correctly handles all Indian banking risk signals:
+ * structuring thresholds, mule scores, nocturnal patterns, scam keywords, etc.
+ *
+ * FastAPI / XGBoost is still used for model-info stats on the ML Model page.
  */
 async function scoreTransaction(transaction, senderAccount, receiverAccount) {
-  const available = await isFastApiAvailable();
-
-  if (available) {
-    try {
-      return await scoreViaFastApi(transaction, senderAccount, receiverAccount);
-    } catch (error) {
-      logger.warn("FastAPI scoring failed, falling back to rules", { error: error.message });
-    }
-  }
-
-  // Rule-based fallback
   return ruleBasedScore(transaction, senderAccount, receiverAccount);
 }
 
