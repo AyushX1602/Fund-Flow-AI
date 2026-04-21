@@ -1,0 +1,765 @@
+================================================================================
+FUNDFLOW AI — COMPLETE SYSTEM WORKFLOW
+================================================================================
+
+DIAGRAM 1 — ARCHITECTURE OVERVIEW
+================================================================================
+
+  Browser (React 19 + Vite :5173)
+  │
+  ├── Pages
+  │   ├── /                  LandingPage
+  │   ├── /dashboard         DashboardPage
+  │   ├── /analyze           AnalyzePage
+  │   ├── /alerts            AlertsPage
+  │   ├── /transactions      TransactionsPage
+  │   ├── /network           NetworkPage
+  │   ├── /investigations    InvestigationsPage
+  │   ├── /accounts          AccountsPage
+  │   └── /model             ModelPage
+  │
+  ├── State (Zustand)
+  │   ├── dashboardStore.js
+  │   ├── alertStore.js
+  │   ├── transactionStore.js
+  │   ├── simulationStore.js
+  │   └── themeStore.js (dark/light persisted in localStorage)
+  │
+  ├── API Layer
+  │   ├── axios instance  baseURL=/api  X-Demo-Mode:true  timeout:60s
+  │   └── socket.io-client singleton  → ws://localhost:5000
+  │
+  ↓  HTTP /api/*  (Vite proxies to :5000)
+  ↓  WebSocket /socket.io
+
+  Node.js / Express v5 (:5000)
+  │
+  ├── Middleware (every request)
+  │   ├── helmet()           security headers
+  │   ├── cors()             allow browser origin
+  │   ├── morgan()           HTTP access logs
+  │   ├── rateLimiter        100 req / 15 min
+  │   ├── auth middleware     X-Demo-Mode → bypass JWT
+  │   └── validate(schema)   Joi schema validation
+  │
+  ├── Routes → Controllers → Services
+  │
+  ├── Prisma ORM → PostgreSQL (:5432)
+  │   └── 12 tables (see Diagram 8)
+  │
+  ├── Socket.io server       real-time events to browser
+  │
+  ↓  HTTP :8000
+
+  FastAPI / Uvicorn (:8000)          [Python — XGBoost]
+  ├── POST /predict                  single transaction scoring
+  ├── GET  /explain/:txnId           SHAP-lite explanation
+  ├── GET  /model-info               metrics + feature importance
+  └── GET  /health                   used by Node.js health check
+
+  LLM Layer
+  ├── Ollama (:11434)                qwen3:8b  keep_alive=5m
+  └── Gemini API (cloud)             gemini-2.5-flash-preview-04-17
+
+
+================================================================================
+DIAGRAM 2 — HTTP REQUEST LIFECYCLE (every API call)
+================================================================================
+
+  Browser
+    │
+    │  POST /api/transactions  {body}
+    ↓
+  Express App
+    │
+    ├─[1] helmet()             add security headers
+    ├─[2] cors()               allow origin http://localhost:5173
+    ├─[3] morgan()             log "POST /api/transactions 201 142ms"
+    ├─[4] express.json()       parse JSON body
+    ├─[5] rateLimiter          check 100 req/15min per IP
+    ├─[6] auth middleware
+    │      ↳ header X-Demo-Mode: true?
+    │           YES → skip JWT, set req.user = demoUser
+    │           NO  → verify JWT → extract userId + role
+    ├─[7] validate(schema)
+    │      ↳ Joi validates body fields (amount, type, etc.)
+    │      ↳ invalid → 400 { success:false, message:"..." }
+    │
+    ├─[8] Route matches  POST /transactions
+    │      ↳ transactionController.createTransaction(req, res)
+    │
+    ├─[9] Controller calls Service
+    │      ↳ transactionService.processTransaction(data, userId)
+    │
+    ├─[10] Service calls Prisma
+    │      ↳ prisma.transaction.create({...})
+    │      ↳ Prisma generates SQL → PostgreSQL
+    │
+    ├─[11] Controller builds response
+    │      ↳ ApiResponse.success(res, 201, "Transaction processed", data)
+    │
+    └─[12] Response
+           { success: true, message: "...", data: { transaction, mlResult, alert } }
+           ↓
+         Browser axios interceptor
+           response => response.data   ← unwraps envelope automatically
+
+
+================================================================================
+DIAGRAM 3 — TRANSACTION SUBMISSION FULL PIPELINE
+================================================================================
+
+  User on AnalyzePage clicks "Run Full Analysis"
+    │
+    ├── activeScenario is SET (preset clicked)?
+    │     YES → return DEMO_RESULTS[activeScenario]  after 1.2s fake delay
+    │            No API call. No DB write.
+    │
+    └── NO → real API path continues below
+          │
+          POST /api/transactions
+          │
+          transactionController.createTransaction
+          │
+          transactionService.processTransaction(data, userId, opts)
+          │
+          ├─[A] Fetch senderAccount from DB
+          │     prisma.account.findUnique({ where: { id: data.senderAccountId } })
+          │
+          ├─[B] Fetch receiverAccount from DB
+          │
+          ├─[C] Parse UPI VPA
+          │     "user123@oksbi" → pspSender = "SBI"
+          │     "merchant99@ybl" → pspReceiver = "YES_BANK"
+          │
+          ├─[D] Create Transaction record
+          │     prisma.transaction.create({
+          │       transactionId, amount, currency, type, channel,
+          │       senderAccountId, receiverAccountId,
+          │       upiVpaSender, upiVpaReceiver, pspSender, pspReceiver,
+          │       vpaAgeDays, chainId, ringId, ipAddress,
+          │       location, description, timestamp
+          │     })
+          │
+          ├─[E] Socket.io emit TRANSACTION_NEW
+          │     → browser LiveTransactionFeed updates
+          │
+          ├─[F] mlService.scoreTransaction()   ← RULE-BASED ENGINE
+          │     (XGBoost NOT used for live scoring — see note in Diagram 4)
+          │
+          │     SCORING RULES (additive, clamped 0.0–1.0):
+          │     ─────────────────────────────────────────
+          │     amount > 500,000                    → +0.30
+          │     UPI + amount > 50,000               → +0.25
+          │     45,000 ≤ amount ≤ 50,000            → +0.25  (structuring)
+          │     900,000 ≤ amount ≤ 1,000,000        → +0.30  (PMLA threshold)
+          │     kycType == OTP_BASED                → +0.10
+          │     kycType == MIN_KYC                  → +0.15
+          │     sender.kycFlagged == true           → +0.20
+          │     sender.muleScore > 0.5              → +0.20
+          │     receiver.muleScore > 0.5            → +0.15
+          │     sender.bankName ≠ receiver.bankName → +0.05
+          │     account age < 30 days               → +0.15
+          │     vpaAgeDays < 7                      → +0.10
+          │     sender.isFrozen                     → +0.40
+          │     receiver.isFrozen                   → +0.30
+          │     hour ∈ [1, 5] (1AM–5AM)             → +0.10
+          │     description has scam keyword        → +0.35
+          │       keywords: prize, lottery, investment return,
+          │                 forex profit, job advance, loan, otp,
+          │                 urgent help, award money, kyc update
+          │
+          │     fraudScore = clamp(sum, 0, 1)
+          │     isFraud    = fraudScore >= config.alertThreshold (0.70)
+          │     return { fraudScore, isFraud, reasons[], modelVersion }
+          │
+          ├─[G] Promise.all — THREE parallel tasks:
+          │
+          │     [G1] prisma.transaction.update
+          │           fraudScore, isFraud, mlModelVersion, mlReasons JSON
+          │
+          │     [G2] prisma.fundFlowEdge.create
+          │           sourceAccountId → targetAccountId
+          │           amount, riskScore, transactionId, timestamp
+          │
+          │     [G3] riskEngine.computeRiskLayers()   ← 6-LAYER ENGINE
+          │          ┌───────────────────────────────────────────────┐
+          │          │ L1 Location (weight 12%)                      │
+          │          │   bankName has "cooperative/urban/gramin"?    │
+          │          │   city in TIER3_CITIES (Bhagalpur, Gorakhpur)?│
+          │          │   PSP in HIGH_RISK_PSPS (fino,paytm,airtel)?  │
+          │          │                                               │
+          │          │ L2 Channel (weight 10%)                       │
+          │          │   MOBILE_APP=0.25  NET_BANKING=0.15           │
+          │          │   ATM=0.40         BRANCH=0.10                │
+          │          │                                               │
+          │          │ L3 Behavioral (weight 18%)                    │
+          │          │   amount vs sender 30-day avg from DB         │
+          │          │   deviation > 3× avg → high score             │
+          │          │                                               │
+          │          │ L4 ML Score (weight 35%)                      │
+          │          │   = fraudScore from rule engine above         │
+          │          │                                               │
+          │          │ L5 Network Graph (weight 15%)                 │
+          │          │   ring membership via FundFlowEdge DB queries │
+          │          │   chainId matches → elevated score            │
+          │          │                                               │
+          │          │ L6 Velocity (weight 10%)                      │
+          │          │   count transactions in last 5 min for sender │
+          │          │                                               │
+          │          │ compositeScore =                              │
+          │          │   (0.7 × max_layer) + (0.3 × weighted_avg)   │
+          │          └───────────────────────────────────────────────┘
+          │
+          ├─[H] Socket.io emit TRANSACTION_SCORED
+          │
+          ├─[I] Gemini / Ollama LLM  (see Diagram 7)
+          │     effectiveScore = max(fraudScore, compositeScore)
+          │     ONLY if 0.35 ≤ effectiveScore ≤ 0.75  (uncertain zone)
+          │     Otherwise llmAnalysis = null
+          │
+          ├─[J] Alert creation
+          │     if isFraud OR effectiveScore >= 0.70:
+          │       alertType = from reasons:
+          │         MULE_ACCOUNT / SUSPICIOUS_PATTERN /
+          │         HIGH_VALUE / VELOCITY_BREACH / FRAUD_DETECTED
+          │       severity = score >= 0.80 → CRITICAL
+          │                  score >= 0.60 → HIGH
+          │                  score >= 0.30 → MEDIUM  else LOW
+          │       prisma.alert.create({
+          │         alertType, severity, transactionId,
+          │         description, riskScore,
+          │         mlReasons: {                ← JSON blob
+          │           reasons, mlScore, compositeScore,
+          │           layers, dominantLayer,
+          │           llm: { verdict, confidence, reasoning, flags }
+          │         }
+          │       })
+          │       Socket.io emit ALERT_CREATED
+          │
+          ├─[K] Update account risk scores (sender + receiver)
+          │     last 50 transactions, weighted decay: weight = 1/(idx+1)
+          │     riskScore = weighted avg of fraudScores
+          │     muleScore = fraudAsSender / total × 2, capped at 1
+          │
+          └─[L] Return HTTP 201
+                { success, data: { transaction, mlResult, riskProfile,
+                                   llmAnalysis, alert } }
+
+
+================================================================================
+DIAGRAM 4 — FASTAPI ML SERVICE STARTUP + PREDICTION
+================================================================================
+
+  python run.py
+    │
+    uvicorn api.main:app  host=127.0.0.1  port=8000  reload=True
+    │
+    STARTUP (lifespan):
+    ├─[1] Load india_extras.pkl    (~103MB)
+    │     VPA / KYC / CIBIL data for 875,215 accounts
+    │
+    ├─[2] Load graph_features.pkl  (~71MB)
+    │     mule_score, in_ring, passthrough_ratio per account
+    │
+    ├─[3] Build transaction graph (NetworkX DiGraph)
+    │     detect rings (6 detected in training data)
+    │     compute mule scores: 9,571 accounts flagged
+    │
+    └─[4] FastAPI READY — 4 endpoints available
+
+  POST /predict  {transaction JSON from Node.js}
+    │
+    ├─[A] Map Node.js fields → internal schema
+    │     type/txn_type, channel, sender_account, etc.
+    │
+    ├─[B] features/engineering.py  engineer_single()
+    │
+    │     49 FEATURES COMPUTED:
+    │     ── Amount ──────────────────────────────────────
+    │     amount_log          = log(amount + 1)
+    │     amount_bucket       = [<1K, 1K-10K, 10K-50K, ...]
+    │
+    │     ── Type flags ──────────────────────────────────
+    │     type_UPI, type_NEFT, type_IMPS, type_ATM, type_DEPOSIT
+    │
+    │     ── Channel ─────────────────────────────────────
+    │     channel_mobile, channel_internet
+    │
+    │     ── Time ────────────────────────────────────────
+    │     hour_of_day         = timestamp.hour (UTC)
+    │     is_night            = hour in [22,23,0,1,2,3,4,5]
+    │
+    │     ── Thresholds ──────────────────────────────────
+    │     near_50k_threshold  = 45000 <= amt <= 49999
+    │     near_100k_threshold = 90000 <= amt <= 99999
+    │     near_1m_threshold   = 900000 <= amt <= 999999
+    │     near_any_threshold  = any of above
+    │     is_round_10k        = amt % 10000 == 0
+    │     is_round_1k         = amt % 1000 == 0
+    │
+    │     ── Receiver / Cross-bank ───────────────────────
+    │     is_new_receiver     = 0 (neutral default)
+    │     is_cross_bank_upi   = UPI + different bank prefix
+    │     upi_new_recv_risk   = UPI + amt > 50000
+    │
+    │     ── Aggregate stats (NO history fallback) ───────
+    │     sender_avg_amount   = 78917.0  (training data median)
+    │     sender_std_amount   = 60000.0
+    │     sender_txn_count_1h = 1
+    │     sender_txn_count_24h= 5  (neutral)
+    │     amount_deviation    = 0.0
+    │     time_since_last_txn_min = 60.0  (neutral = 1 hour)
+    │
+    │     ── Velocity ────────────────────────────────────
+    │     high_velocity_1h    = txn_count_1h >= 5
+    │     high_velocity_24h   = txn_count_24h >= 20
+    │     rapid_succession    = time_since_last < 5 min
+    │     hour_velocity_ratio = count_1h / (count_24h/24)
+    │
+    │     ── Graph (from graph_features.pkl) ─────────────
+    │     sender_mule_score        receiver_mule_score
+    │     sender_in_ring           receiver_in_ring
+    │     sender_passthrough_ratio receiver_unique_senders_total
+    │     sender_is_new_account    receiver_is_new_account
+    │     receiver_is_pure_receiver
+    │     receiver_is_suspected_mule
+    │
+    │     ── India extras (from india_extras.pkl) ─────────
+    │     vpa_age_days, kyc_level, cibil_tier (if available)
+    │
+    ├─[C] models/predictor.py  predict_single()
+    │     X = np.array([[feature_values]])
+    │     raw_prob = xgboost_model.predict_proba(X)[0][1]
+    │
+    ├─[D] Platt Scaling Calibration
+    │     A = -92.0,  B = 88.0
+    │     calibrated = 1 / (1 + exp(A × raw_prob + B))
+    │     mapping:
+    │       raw=0.87 → calibrated ≈ 0.00  (safe)
+    │       raw=0.94 → calibrated ≈ 0.18  (low)
+    │       raw=0.97 → calibrated ≈ 0.77  (high)
+    │       raw=0.99 → calibrated ≈ 0.97  (critical)
+    │
+    ├─[E] Risk tier
+    │     < 0.30 → LOW
+    │     < 0.60 → MEDIUM
+    │     < 0.80 → HIGH
+    │     else   → CRITICAL
+    │
+    ├─[F] SHAP-lite (NOT real SHAP library)
+    │     top 5 active features ranked by feature_importance weight
+    │     "contribution" = importance value (not a log-odds contribution)
+    │
+    └─[G] Return
+          { fraud_score, is_fraud, reasons[], risk_tier,
+            model_version:"xgboost-v1", raw_model_prob }
+
+  !! IMPORTANT NOTE !!
+  Node.js does NOT call FastAPI for live transaction scoring.
+  FastAPI is only called by:
+    - GET /api/ml/model-info  → to display metrics on ModelPage
+    - GET /api/ml/status      → health check
+  The rule-based engine (Diagram 3-F) handles all live scoring.
+  Reason: XGBoost outputs 0.87–0.99 for all transactions without
+  real account history, making calibration unreliable.
+
+
+================================================================================
+DIAGRAM 5 — XGBOOST TRAINING PIPELINE (run once offline)
+================================================================================
+
+  Kaggle PaySim Dataset (~500K synthetic transactions)
+    │
+    python kaggle_preprocess.py
+    ├── Map column names
+    ├── Remove nulls
+    ├── Encode categorical (type, channel)
+    └── Save → data/processed/transactions_processed.csv
+               amount median:  ₹78,917
+               amount mean:    ₹1,71,299
+               fraud rate:     ~1.3%
+
+    │
+    python features/graph_features.py
+    ├── Build NetworkX DiGraph from all transaction pairs
+    ├── Per account compute:
+    │   mule_score, in_ring, passthrough_ratio,
+    │   is_suspected_mule, is_pure_receiver
+    └── Save → models/graph_features.pkl  (~71MB)
+
+    │
+    python models/trainer.py
+    ├── Load transactions_processed.csv
+    ├── Call engineer_features() (batch mode, real rolling history)
+    ├── XGBoostClassifier(
+    │     n_estimators=300,
+    │     max_depth=6,
+    │     scale_pos_weight=(negatives/positives)  ← handles imbalance
+    │   )
+    ├── Train on 80% split, evaluate on 20%
+    ├── Compute: precision, recall, F1, AUC-ROC, AUC-PR
+    ├── Save → models/xgboost_fraud.pkl         (joblib)
+    └── Save → models/model_metadata.json
+               { feature_columns[49], feature_importance{}, metrics{} }
+
+    │
+    python models/update_db_scores.py  (optional — batch rescore)
+    ├── Load all transactions from CSV
+    ├── Run predict_batch() on each chunk
+    ├── Update DB: fraudScore, riskScore, riskTier per row
+    └── Print summary stats
+
+
+================================================================================
+DIAGRAM 6 — SOCKET.IO REAL-TIME EVENT FLOW
+================================================================================
+
+  Server startup (server/index.js):
+    const io = new Server(httpServer, { cors: { origin: "*" } })
+    transactionService.setSocketIO(io)
+
+  Event 1: TRANSACTION_NEW
+    Trigger:  transactionService step [D] — after DB write, before scoring
+    Payload:  { id, transactionId, amount, type, timestamp }
+    Browser:  socket.on('TRANSACTION_NEW', cb)
+              → LiveTransactionFeed.jsx adds pending item to feed
+
+  Event 2: TRANSACTION_SCORED
+    Trigger:  transactionService step [H] — after scoring + layer calc
+    Payload:  { id, transactionId, fraudScore, isFraud, reasons[] }
+    Browser:  socket.on('TRANSACTION_SCORED', cb)
+              → Feed item updates from "pending" → score badge
+
+  Event 3: ALERT_CREATED
+    Trigger:  transactionService step [J] — after alert DB insert
+    Payload:  { id, alertType, severity, riskScore, transactionId, amount }
+    Browser:  socket.on('ALERT_CREATED', cb)
+              → alertStore.fetchAlerts() refresh
+              → Toast notification (if implemented)
+
+  Event 4: simulation:progress
+    Trigger:  simulationService — every transaction during simulation run
+    Payload:  { processed, total, fraudFound, currentBatch }
+    Browser:  socket.on('simulation:progress', cb)
+              → simulationStore.setProgress(payload)
+              → Progress bar updates on UI
+
+
+================================================================================
+DIAGRAM 7 — LLM ROUTING LOGIC
+================================================================================
+
+  llmService.analyseTransaction(transaction, senderAccount, mlResult, riskProfile)
+    │
+    effectiveScore = max(mlResult.fraudScore, riskProfile.compositeScore)
+    │
+    ├── effectiveScore < 0.35  → return null  (clearly legit, skip LLM)
+    ├── effectiveScore > 0.75  → return null  (clearly fraud, skip LLM)
+    └── 0.35 ≤ score ≤ 0.75   → continue below
+          │
+          cacheKey = hash of (transactionId + top features)
+          │
+          ├── analysisCache.has(cacheKey) AND age < 30min?
+          │     YES → return cached verdict  (fromCache: true)
+          │     NO  → continue
+          │
+          LLM_PROVIDER env var:
+          ├── "ollama" → go direct to Ollama
+          ├── "gemini" → go direct to Gemini
+          └── "auto"   → try Ollama first (DEFAULT)
+                │
+                isOllamaRunning()?
+                  GET http://localhost:11434/api/tags
+                  check model list includes "qwen3"
+                │
+                ├── YES → callOllama()
+                │         POST :11434/api/generate
+                │         model: "qwen3:8b"
+                │         keep_alive: "5m"    ← stays in VRAM
+                │         stream: false
+                │         timeout: 60s
+                │         prompt: structured fraud context + question
+                │
+                └── NO  → try Gemini
+                          GEMINI_API_KEY in .env?
+                          │
+                          ├── NO KEY  → return null
+                          │
+                          └── YES
+                                dailyCallCount >= 100? → return null
+                                Date.now() - lastCallTime < 4000?
+                                  → wait remainder  (15 RPM guard)
+                                dailyCallCount++
+                                lastCallTime = Date.now()
+                                │
+                                geminiModel.generateContent(prompt)
+                                timeout: 25s
+                                model: gemini-2.5-flash-preview-04-17
+
+          Parse JSON response → extract:
+            verdict:    LIKELY_FRAUD | LIKELY_LEGITIMATE |
+                        UNCERTAIN | NEEDS_INVESTIGATION
+            confidence: 0.0–1.0
+            reasoning:  free text explanation
+            flags:      string array of triggered risk signals
+
+          Store in analysisCache (30min TTL)
+          Return { verdict, confidence, reasoning, flags, fromCache }
+
+
+================================================================================
+DIAGRAM 8 — DATABASE SCHEMA (PostgreSQL via Prisma)
+================================================================================
+
+  User
+  ├── id          String  PK (cuid)
+  ├── email       String  UNIQUE
+  ├── passwordHash String
+  ├── firstName   String
+  ├── lastName    String
+  ├── role        Enum    ADMIN | ANALYST | VIEWER
+  └── createdAt   DateTime
+
+  Account
+  ├── id              String   PK
+  ├── accountNumber   String   UNIQUE
+  ├── accountHolder   String
+  ├── bankName        String
+  ├── bankBranch      String?
+  ├── accountType     Enum     SAVINGS | CURRENT | ...
+  ├── kycType         Enum     FULL_KYC | MIN_KYC | OTP_BASED
+  ├── kycFlagged      Boolean
+  ├── kycFlagReason   String?
+  ├── muleScore       Float    (0.0–1.0, rolling updated)
+  ├── riskScore       Float    (0.0–1.0, rolling updated)
+  ├── isFrozen        Boolean
+  ├── frozenAt        DateTime?
+  ├── frozenReason    String?
+  └── createdAt       DateTime
+
+  Transaction
+  ├── id              String  PK
+  ├── transactionId   String  UNIQUE  (TXN-XXXXX format)
+  ├── amount          Float
+  ├── currency        String  default "INR"
+  ├── type            Enum    UPI | NEFT | IMPS | ATM | DEPOSIT
+  ├── channel         Enum    MOBILE_APP | NET_BANKING | ATM | BRANCH
+  ├── senderAccountId String  FK → Account
+  ├── receiverAccountId String FK → Account
+  ├── fraudScore      Float?  (null until scored)
+  ├── isFraud         Boolean default false
+  ├── mlReasons       Json?   (array of {feature, impact, value, description})
+  ├── mlModelVersion  String?
+  ├── upiVpaSender    String?
+  ├── upiVpaReceiver  String?
+  ├── pspSender       String?
+  ├── pspReceiver     String?
+  ├── vpaAgeDays      Int?
+  ├── chainId         String?
+  ├── ringId          String?
+  ├── ipAddress       String?
+  ├── deviceId        String?
+  ├── location        String?
+  ├── description     String?
+  └── timestamp       DateTime
+
+  Alert
+  ├── id            String  PK
+  ├── alertType     Enum    FRAUD_DETECTED | MULE_ACCOUNT |
+  │                         SUSPICIOUS_PATTERN | HIGH_VALUE |
+  │                         VELOCITY_BREACH
+  ├── severity      Enum    LOW | MEDIUM | HIGH | CRITICAL
+  ├── status        Enum    NEW | INVESTIGATING | ESCALATED |
+  │                         RESOLVED_FRAUD | RESOLVED_LEGITIMATE | DISMISSED
+  ├── transactionId String  FK → Transaction  UNIQUE
+  ├── riskScore     Float
+  ├── description   String
+  └── mlReasons     Json    {
+                              reasons[], mlScore, compositeScore,
+                              layers{L1..L6}, dominantLayer,
+                              triggeredBy,
+                              llm: { verdict, confidence, reasoning, flags }
+                            }
+
+  Investigation
+  ├── id          String  PK
+  ├── alertId     String  FK → Alert  UNIQUE
+  ├── title       String
+  ├── status      Enum    OPEN | IN_PROGRESS | CLOSED | ESCALATED
+  ├── priority    Enum    LOW | MEDIUM | HIGH | CRITICAL
+  ├── assignedTo  String? FK → User
+  └── notes       CaseNote[]
+
+  CaseNote
+  ├── id              String  PK
+  ├── investigationId String  FK → Investigation
+  ├── userId          String  FK → User
+  ├── content         String
+  └── noteType        Enum    OBSERVATION | ACTION | ESCALATION | RESOLUTION
+
+  FundFlowEdge
+  ├── id              String  PK
+  ├── chainId         String?
+  ├── sourceAccountId String  FK → Account
+  ├── targetAccountId String  FK → Account
+  ├── transactionId   String  FK → Transaction  UNIQUE
+  ├── amount          Float
+  ├── riskScore       Float
+  └── timestamp       DateTime
+
+  AuditLog
+  ├── id          String  PK
+  ├── userId      String?
+  ├── action      String  (e.g. TRANSACTION_CREATED, ALERT_UPDATED)
+  ├── entityType  String
+  ├── entityId    String?
+  ├── metadata    Json?
+  ├── ipAddress   String?
+  └── createdAt   DateTime
+
+  SimulationRun
+  ├── id                String  PK
+  ├── status            Enum    RUNNING | COMPLETED | FAILED
+  ├── totalTransactions Int
+  ├── fraudCount        Int
+  ├── startedAt         DateTime
+  └── completedAt       DateTime?
+
+  ModelMetadata
+  ├── id          String  PK
+  ├── modelName   String
+  ├── version     String
+  ├── metrics     Json    { precision, recall, f1, auc_roc, auc_pr }
+  ├── features    Json    (array of 49 feature names)
+  └── trainedAt   DateTime
+
+  RiskThreshold
+  ├── id        String PK
+  ├── name      String (alertThreshold, highRiskThreshold, etc.)
+  └── value     Float
+
+  SystemConfig
+  ├── id    String PK
+  ├── key   String UNIQUE
+  └── value String
+
+
+================================================================================
+DIAGRAM 9 — PAGE → API ENDPOINT MAPPING
+================================================================================
+
+  DashboardPage (/dashboard)
+    GET /api/dashboard/metrics
+        → { total, fraud, alerts, accounts, recentAlerts }
+    GET /api/dashboard/fraud-trend
+        → [{ date:"Apr 01", total:45, fraud:3 }, ...]   (30 days)
+    GET /api/dashboard/channel-distribution
+        → [{ channel:"UPI", count:120 }, ...]
+    GET /api/dashboard/risk-histogram
+        → [{ range:"0-10%", count:87 }, ...]
+    GET /api/dashboard/top-risk
+        → [{ id, transactionId, amount, fraudScore, type }, ...]
+    GET /api/dashboard/live-feed
+        → last 5 transactions for initial feed render
+    SOCKET: TRANSACTION_NEW, TRANSACTION_SCORED, ALERT_CREATED
+
+  AnalyzePage (/analyze)
+    GET /api/accounts?limit=50
+        → [{ id, accountHolder, bankName, kycType, muleScore }, ...]
+    POST /api/transactions
+        → { success, data: { transaction, mlResult, alert } }
+    GET /api/transactions/:id
+        → { success, data: { ...transaction, senderAccount, receiverAccount } }
+    [Demo mode: no API call when preset is active]
+
+  AlertsPage (/alerts)
+    GET /api/alerts?page=1&limit=20&severity=&status=
+        → { success, data: { alerts:[], total, page, pages } }
+    GET /api/alerts/:id
+        → { success, data: { ...alert, transaction } }
+    PATCH /api/alerts/:id
+        body: { status: "INVESTIGATING" }
+        → { success, data: updatedAlert }
+
+  TransactionsPage (/transactions)
+    GET /api/transactions?page=1&limit=20&type=&channel=&isFraud=
+        → { success, data: { transactions:[], total, page } }
+    GET /api/transactions/:id
+        → full transaction with accounts + alert
+
+  NetworkPage (/network)
+    GET /api/graph/nodes
+        → [{ id, accountHolder, bankName, riskScore, muleScore, isFrozen }]
+    GET /api/graph/edges
+        → [{ source, target, amount, riskScore, type, timestamp }]
+    GET /api/graph/account/:id
+        → { account, connectedEdges[], neighbors[] }
+    [Client-side: edge aggregation — duplicate source→target merged]
+    [react-force-graph-2d canvas rendering]
+
+  InvestigationsPage (/investigations)
+    GET /api/investigations
+        → [{ id, title, status, priority, alert, assignedTo }]
+    POST /api/investigations
+        body: { alertId, title, priority }
+        → { success, data: newInvestigation }
+    GET /api/investigations/:id
+        → { ...investigation, notes[], alert, transaction }
+    PATCH /api/investigations/:id
+        body: { status, priority, assignedTo }
+    POST /api/investigations/:id/notes
+        body: { content, noteType }
+
+  AccountsPage (/accounts)
+    GET /api/accounts?limit=50
+        → [{ id, accountHolder, bankName, kycType, muleScore, riskScore,
+             isFrozen, createdAt }]
+    GET /api/accounts/:id
+        → { account, recentTransactions[] }
+    PATCH /api/accounts/:id
+        body: { isFrozen, frozenReason }
+        → { success, data: updatedAccount }
+
+  ModelPage (/model)
+    GET /api/ml/status
+        → { available: true/false }
+    GET /api/ml/model-info
+        IF FastAPI running → proxies to FastAPI GET /model-info
+          → { modelName:"xgboost-fraud-detector", version, metrics,
+              feature_importance{}, isMLActive:true }
+        IF FastAPI down → rule-based stats computed from last 500 DB txns
+          → { modelName:"rule-based-fallback", rulesCount:12,
+              metrics:{precision,recall,f1,auc_roc}, isMLActive:false }
+
+
+================================================================================
+HOW ALL 3 SERVICES START
+================================================================================
+
+  Terminal 1 — PostgreSQL must be running (external, Prisma connects via .env)
+
+  Terminal 2 — Node.js backend
+    cd server && npm run dev
+    → nodemon index.js
+    → Express :5000 ready
+    → Socket.io ready
+    → Ollama warmup attempt (qwen3:8b keep_alive)
+
+  Terminal 3 — React frontend
+    cd client && npm run dev
+    → Vite :5173
+    → Proxy /api → :5000
+    → Proxy /socket.io → :5000
+
+  Terminal 4 — Python ML service (optional, for model-info only)
+    cd Fraud_Detection/Fraud_Detection
+    .\venv\Scripts\activate
+    python run.py
+    → Uvicorn :8000
+    → Loads india_extras.pkl + graph_features.pkl (takes ~60s)
+    → FastAPI ready
+
+================================================================================
+END OF WORKFLOW DOCUMENT
+================================================================================

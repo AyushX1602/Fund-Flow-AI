@@ -50,5 +50,6 @@ router.put("/:id/freeze", authenticate, authorize("SUPERVISOR", "ADMIN"), valida
 router.put("/:id/unfreeze", authenticate, authorize("SUPERVISOR", "ADMIN"), validate(freezeSchema), accountController.unfreezeAccount);
 router.get("/:id/transactions", authenticate, accountController.getTransactions);
 router.get("/:id/risk-profile", authenticate, accountController.getRiskProfile);
+router.get("/:id/freeze-simulate", authenticate, accountController.freezeSimulate);
 
 module.exports = router;

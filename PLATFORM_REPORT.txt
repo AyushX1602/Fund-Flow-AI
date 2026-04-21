@@ -1,0 +1,607 @@
+================================================================================
+FUNDFLOW AI — PLATFORM TECHNICAL REPORT
+Generated: 2026-04-17
+================================================================================
+
+This document is a factual account of what has been implemented in the
+FundFlow AI platform. Nothing in here is aspirational or speculative.
+
+--------------------------------------------------------------------------------
+1. WHAT THIS SYSTEM IS
+--------------------------------------------------------------------------------
+
+FundFlow AI is a real-time fraud detection and investigation platform built
+for Public Sector Banks (PSBs) in India. It processes UPI, NEFT, IMPS, and
+ATM transactions, assigns risk scores, and flags potential fraud using a
+multi-layered scoring system.
+
+It is NOT a production-grade deployed system. It is a working hackathon
+prototype with a real ML pipeline, real DB, and real-time WebSocket feeds.
+
+--------------------------------------------------------------------------------
+2. TECH STACK
+--------------------------------------------------------------------------------
+
+BACKEND — Node.js
+  Runtime:         Node.js v24 (with TypeScript-style .mjs support)
+  Framework:       Express v5.2.1
+  ORM:             Prisma v6.19.3
+  Database:        PostgreSQL (via Prisma, connection via DATABASE_URL env var)
+  Auth:            JWT (jsonwebtoken v9.0.3) + bcryptjs v3.0.3
+  WebSockets:      Socket.io v4.8.3
+  Validation:      Joi v18.1.2
+  Rate limiting:   express-rate-limit v8.3.2
+  Security:        Helmet v8.1.0 + CORS
+  Logging:         Winston v3.19.0 + Morgan (HTTP logs)
+  CSV parsing:     csv-parser v3.2.0
+  ID generation:   uuid v13.0.0
+  LLM (cloud):     @google/generative-ai v0.24.1 (Gemini)
+  LLM (local):     Ollama HTTP API (no npm package, raw axios calls)
+  Process manager: nodemon (dev), no PM2 or cluster configured
+
+ML SERVICE — Python / FastAPI
+  Runtime:         Python 3.x (in venv at Fraud_Detection/Fraud_Detection/venv)
+  Framework:       FastAPI + Uvicorn (ASGI, auto-reload in dev via StatReload)
+  ML model:        XGBoost (scikit-learn wrapper, joblib-serialized)
+  Features:        49 features engineered from transaction + account history
+  Serving:         uvicorn on http://localhost:8000
+  Feature eng:     Custom module (features/engineering.py)
+  Graph features:  Precomputed NetworkX graph — loaded at startup as
+                   graph_features.pkl (~71MB)
+  India extras:    Precomputed VPA/KYC/CIBIL data as india_extras.pkl (~103MB)
+  SHAP:            NOT real SHAP. Uses feature_importance × feature_value as
+                   a proxy. Labeled "SHAP-lite" in the code. Raw SHAP
+                   library (shap) is NOT installed or used.
+
+FRONTEND — React
+  Runtime:         React 19.2.4
+  Build tool:      Vite + @tailwindcss/vite v4.2.2
+  CSS:             Tailwind CSS v4.2.2
+  Routing:         react-router-dom v7.14.0
+  State:           Zustand v5.0.12
+  UI primitives:   Radix UI (collapsible, slot, dialog, dropdown, etc.)
+  Component layer: shadcn/ui (button, card, badge, table, tabs, dialog, etc.)
+  Charts:          Recharts v3.8.0
+  Network graph:   react-force-graph-2d v1.29.1 (canvas-based force layout)
+  Animations:      Framer Motion v12.38.0 + GSAP v3.15.0
+  Icons:           Lucide React v1.8.0 + Heroicons v2.2.0
+  Fonts:           Geist + Geist Mono (@fontsource-variable)
+  HTTP client:     Axios v1.15.0 (with interceptor for error unwrapping)
+  WebSocket:       socket.io-client v4.8.3
+
+DATABASE SCHEMA (PostgreSQL via Prisma)
+  Tables:
+    User            — Auth accounts (email, password hash, role)
+    Account         — Bank accounts (holder, bank, KYC type, mule score,
+                      risk score, isFrozen, accountNumber)
+    Transaction     — All transactions (amount, type, channel, fraudScore,
+                      isFraud, mlReasons JSON, mlModelVersion, timestamps)
+    Alert           — Fraud alerts (severity, alertType, status, mlReasons JSON)
+    Investigation   — Case investigations linked to alerts
+    CaseNote        — Notes on investigations
+    FundFlowEdge    — Graph edges (sourceAccount → targetAccount per txn)
+    AuditLog        — Every user action is logged
+    SimulationRun   — Simulation session tracking
+    ModelMetadata   — XGBoost model performance metrics stored in DB
+    RiskThreshold   — Configurable fraud score thresholds
+    SystemConfig    — Key-value system configuration
+
+--------------------------------------------------------------------------------
+3. FEATURES IMPLEMENTED
+--------------------------------------------------------------------------------
+
+3.1 DASHBOARD PAGE
+  - 4 metric cards: Total Transactions, Fraud Detected, Active Alerts,
+    Accounts Monitored
+  - Fraud Trend chart (line chart, 30-day history, powered by seeded data)
+  - Channel Distribution donut chart (UPI/NEFT/IMPS/ATM split)
+  - Risk Score Histogram (distribution of fraud scores)
+  - Top Risk Table (highest-scoring recent transactions)
+  - Recent Alerts panel
+  - Live Transaction Feed (Socket.io stream, last 5 transactions)
+  - All data fetches are polling-based (no Kafka, no server-sent events)
+  - Dark/light mode toggle (Zustand themeStore + CSS variables)
+
+3.2 TRANSACTION ANALYSIS LAB (AnalyzePage)
+  - 5 quick scenario presets: Legitimate, Structuring, High-Value Fraud,
+    Mule Transfer, Uncertain Zone
+  - Manual form: amount, type, channel, sender/receiver account selector,
+    UPI VPA fields, VPA age, city, timestamp, payment remarks
+  - CSV batch upload (multi-row, parsed client-side, submitted sequentially)
+  - Sample CSV download button
+  - Scoring result panel showing:
+      * Risk score gauge (0-100%)
+      * Risk tier badge (SAFE/LOW/MEDIUM/HIGH/CRITICAL)
+      * Transaction summary
+      * ML Score (from rule-based engine, displayed as "ML Score")
+      * Risk Signals list (feature name + impact value)
+      * 6-Layer Composite Score breakdown (if available)
+      * Gemini/Ollama LLM verdict (if score is in 0.35-0.75 uncertain zone)
+      * Alert created status (ID + severity)
+
+3.3 ALERTS PAGE
+  - Paginated alerts table
+  - Filter by severity (CRITICAL, HIGH, MEDIUM, LOW)
+  - Filter by status (NEW, INVESTIGATING, RESOLVED_FRAUD,
+    RESOLVED_LEGITIMATE, ESCALATED, DISMISSED)
+  - Click to expand alert details
+  - Status update (PATCH /api/alerts/:id)
+
+3.4 INVESTIGATIONS PAGE
+  - List of open case investigations
+  - Create investigation from an alert
+  - Add case notes
+  - Update investigation status
+
+3.5 TRANSACTIONS PAGE
+  - Full paginated transaction list
+  - Filter by type, channel, fraud status
+  - Transaction detail view
+
+3.6 ACCOUNTS PAGE
+  - Account list with risk scores, mule scores, KYC type, frozen status
+  - Account detail view with transaction history
+
+3.7 NETWORK PAGE (Fund Flow Graph)
+  - Canvas-based force-directed graph using react-force-graph-2d
+  - Nodes = accounts, edges = transactions
+  - Edge aggregation: duplicate sender→receiver pairs are merged into a
+    single weighted edge (weight = transaction count, line width = weight)
+  - Node color = risk tier (green/yellow/orange/red)
+  - Click node to highlight connected edges
+  - Zoom / pan / drag
+  - NOTE: Graph loads all FundFlowEdge records from DB — can be slow with
+    many transactions
+
+3.8 ML MODEL PAGE
+  - Model name, version, type (XGBoost or rule-based-fallback depending on
+    FastAPI availability)
+  - Performance metrics: precision, recall, F1, AUC-ROC, AUC-PR
+  - Feature importance list (top features from model metadata)
+  - Radar chart of model metrics
+  - isMLActive flag shows if real XGBoost is being used
+
+3.9 LANDING PAGE
+  - Static marketing page (React component)
+  - Animated hero section (Framer Motion / GSAP)
+  - Separate from app (route: /)
+
+3.10 ASK AI FEATURE (Gemini/Ollama per transaction)
+  - Triggered only when effective fraud score is 0.35 ≤ score ≤ 0.75
+  - Outside this range, LLM is skipped (too clear-cut either way)
+  - Default model: qwen3:8b (Ollama local) — loaded with keep_alive="5m"
+    so it stays in VRAM between calls
+  - Fallback: Gemini 2.5 Flash Preview (cloud) if Ollama unavailable
+  - Provider selection: LLM_PROVIDER env var (ollama | gemini | auto)
+  - Rate limiting: 4s gap between Gemini calls, 100 calls/day cap
+  - Response caching: 30-minute in-memory cache (Map) keyed on txn features
+  - LLM verdict stored in Alert.mlReasons.llm JSON field
+
+3.11 SIMULATION ENGINE
+  - simulationService.js generates synthetic transactions
+  - Used to populate the 30-day dashboard history
+  - seed-history.js script creates 577 transactions (40 fraud, 537 legit)
+    and 40 alerts with realistic timestamps
+  - SimulationRun table tracks runs
+
+3.12 AUDIT LOGGING
+  - Every API action creates an AuditLog entry
+  - auditService.js writes async (doesn't block response)
+  - Fields: userId, action, entityType, entityId, metadata, ipAddress
+
+3.13 AUTHENTICATION (demo mode bypassed)
+  - JWT-based auth implemented (authController, authService)
+  - Demo mode: X-Demo-Mode: true header bypasses auth middleware entirely
+  - In production, role-based access (ADMIN, ANALYST, VIEWER) is scaffolded
+
+--------------------------------------------------------------------------------
+4. SCORING SYSTEM — HOW IT ACTUALLY WORKS
+--------------------------------------------------------------------------------
+
+There are THREE scoring components. Not all run for every transaction.
+
+COMPONENT 1: Rule-Based Engine (mlService.js → ruleBasedScore())
+  This is what runs for EVERY live transaction submitted via the Analyze page
+  and API. XGBoost is NOT used for live transaction scoring (see why below).
+
+  Rules and weights:
+    amount > 500,000            +0.30
+    UPI > 50,000                +0.25
+    45,000 ≤ amount ≤ 50,000   +0.25  (near ₹50K reporting threshold)
+    900,000 ≤ amount ≤ 1M      +0.30  (near ₹10L PMLA threshold)
+    KYC = OTP_BASED             +0.10
+    KYC = MIN_KYC               +0.15
+    sender KYC flagged          +0.20
+    sender muleScore > 0.5     +0.20
+    receiver muleScore > 0.5   +0.15
+    cross-bank transfer         +0.05
+    account age < 30 days       +0.15
+    VPA age < 7 days            +0.10
+    sender account frozen       +0.40
+    receiver account frozen     +0.30
+    transaction hour 1AM-5AM   +0.10
+    scam keywords in remarks    +0.35
+      (keywords: prize, lottery, investment return, forex profit, job advance,
+       loan, otp, urgent help, award money, kyc update)
+
+  Score clamped to [0.0, 1.0]. isFraud = score >= alertThreshold (default 0.70).
+  modelVersion returned: "rule-based-v1"
+
+COMPONENT 2: XGBoost Model (FastAPI, predictor.py)
+  Trained on PaySim dataset (~500K synthetic transactions).
+  49 features including:
+    - amount_log, amount_bucket
+    - type_UPI, type_NEFT, type_IMPS, type_ATM
+    - channel_mobile, channel_internet
+    - sender_avg_amount, sender_std_amount, amount_deviation
+    - sender_txn_count_1h, sender_txn_count_24h
+    - time_since_last_txn_min
+    - is_new_receiver, is_cross_bank_upi, upi_new_recv_risk
+    - near_50k_threshold, near_100k_threshold, near_1m_threshold
+    - is_round_10k, is_round_1k
+    - high_velocity_1h, high_velocity_24h, rapid_succession
+    - sender_mule_score, sender_in_ring, sender_passthrough_ratio
+    - receiver_mule_score, receiver_unique_senders_total
+    - is_night, hour_of_day, hour_velocity_ratio
+    - sender_is_new_account, receiver_is_new_account
+    + India-specific features from india_extras.pkl (VPA, KYC, CIBIL)
+
+  WHY NOT USED FOR LIVE SCORING:
+    XGBoost was trained on batch historical data where each account has
+    hundreds of transactions (rolling averages, velocity counts). In live
+    mode, these features default to neutral approximations (population median
+    amounts, neutral times). This causes the model to output raw probabilities
+    of 0.87-0.99 for nearly ALL transactions regardless of actual risk.
+    Calibration attempts (Platt scaling) failed because the model's output
+    distribution differs per transaction type (UPI → 0.94, NEFT → 0.85).
+    So XGBoost is kept for the ML Model page metrics display only.
+
+  modelVersion returned: "xgboost-v1"
+
+COMPONENT 3: 6-Layer Composite Engine (riskEngine.js)
+  Runs in parallel with rule-based scoring. Uses DB queries.
+  Formula: FinalScore = (0.7 × MaxLayer) + (0.3 × WeightedAvg)
+
+  Layers and weights:
+    L1 Location Anomaly   weight=0.12
+      - High-risk bank keywords (cooperative, urban, rural, gramin)
+      - Tier-3 city origin (Bhagalpur, Gorakhpur, etc.)
+      - High-risk PSP (fino, paytm, airtel, ibl)
+    L2 Channel Risk       weight=0.10
+      - MOBILE_APP=0.25, NET_BANKING=0.15, ATM=0.40, BRANCH=0.10
+    L3 Behavioral Pattern weight=0.18
+      - Amount deviation vs sender's 30-day average
+    L4 ML Probability     weight=0.35
+      - The rule-based fraudScore (not XGBoost)
+    L5 Network Graph      weight=0.15
+      - Ring/chain membership via FundFlowEdge DB queries
+    L6 Velocity           weight=0.10
+      - Transactions in last 5 minutes for sender account
+
+  Composite score stored in Alert.mlReasons.compositeScore
+  dominantLayer = whichever layer scored highest
+
+EXPLAINABLE AI:
+  - Risk Signals panel: shows rule names + impact values from Component 1
+  - "SHAP-lite" labels from XGBoost feature importance (NOT real SHAP)
+  - shapLabels.js in frontend: maps raw feature names to human-readable labels
+    e.g. "type_UPI" → "UPI Transaction Type"
+  - LLM verdict: free-text reasoning from Gemini/qwen3:8b
+  - dominantLayer: tells investigator which of the 6 layers triggered alert
+
+--------------------------------------------------------------------------------
+5. API ENDPOINTS (WHAT EXISTS)
+--------------------------------------------------------------------------------
+
+All endpoints prefixed with /api. Response envelope: { success, message, data }.
+
+  POST   /api/auth/login
+  POST   /api/auth/register
+
+  GET    /api/transactions?page&limit&type&channel&isFraud
+  POST   /api/transactions              ← main submission endpoint
+  GET    /api/transactions/:id
+
+  GET    /api/accounts?limit
+  GET    /api/accounts/:id
+  PATCH  /api/accounts/:id
+
+  GET    /api/alerts?page&limit&severity&status
+  GET    /api/alerts/:id
+  PATCH  /api/alerts/:id
+
+  GET    /api/investigations
+  POST   /api/investigations
+  GET    /api/investigations/:id
+  PATCH  /api/investigations/:id
+  POST   /api/investigations/:id/notes
+
+  GET    /api/dashboard/metrics
+  GET    /api/dashboard/fraud-trend
+  GET    /api/dashboard/channel-distribution
+  GET    /api/dashboard/top-risk
+  GET    /api/dashboard/live-feed
+  GET    /api/dashboard/risk-histogram
+
+  GET    /api/graph/nodes
+  GET    /api/graph/edges
+  GET    /api/graph/account/:id
+
+  GET    /api/ml/status
+  GET    /api/ml/model-info
+  GET    /api/ml/explain/:transactionId
+
+  GET    /api/audit-logs
+
+  POST   /api/simulation/run
+  GET    /api/simulation/runs
+
+  GET    /api/health
+
+WebSocket events (Socket.io):
+  TRANSACTION_NEW     — emitted on every new transaction create
+  TRANSACTION_SCORED  — emitted after score assigned
+  ALERT_CREATED       — emitted when alert auto-created
+  simulation:progress — emitted during simulation runs
+
+--------------------------------------------------------------------------------
+6. EXTERNAL APIs / SERVICES ACTUALLY USED
+--------------------------------------------------------------------------------
+
+1. Google Gemini API
+   Package:  @google/generative-ai
+   Model:    gemini-2.5-flash-preview-04-17
+   Used for: LLM analysis of uncertain-zone transactions
+   Requires: GEMINI_API_KEY env var
+   Limits:   15 RPM on free tier, 100 calls/day cap in code
+
+2. Ollama (local LLM runner)
+   URL:      http://localhost:11434 (default)
+   Model:    qwen3:8b (configured in env as OLLAMA_MODEL)
+   Used for: Primary LLM provider (preferred over Gemini in "auto" mode)
+   Keep-alive: 5 minutes in VRAM (set via API parameter)
+
+3. NO external fraud database APIs used
+4. NO RBI/NPCI APIs used
+5. NO payment gateway APIs used
+6. NO cloud hosting (Vercel, AWS etc.) — runs locally
+
+--------------------------------------------------------------------------------
+7. FRONTEND ARCHITECTURE — INTEGRATION GUIDE
+--------------------------------------------------------------------------------
+
+This section is specifically for integrating this frontend into another project
+with the same topic (fraud detection for PSBs).
+
+7.1 STRUCTURE
+
+  src/
+  ├── App.jsx                  — Router setup (all routes defined here)
+  ├── main.jsx                 — React root, imports global CSS
+  ├── index.css                — Tailwind imports + CSS custom properties
+  ├── components/
+  │   ├── layout/
+  │   │   ├── Layout.jsx       — App shell: sidebar + header + <Outlet/>
+  │   │   ├── Sidebar.jsx      — Framer Motion animated sidebar (collapse/expand)
+  │   │   └── Header.jsx       — Top bar with theme toggle and user avatar
+  │   ├── dashboard/           — 7 dashboard widget components (see below)
+  │   └── ui/                  — shadcn/ui primitive components
+  ├── pages/                   — One file per route
+  ├── stores/                  — Zustand stores
+  └── lib/
+      ├── api.js               — Axios instance with baseURL="/api"
+      ├── socket.js            — Socket.io client singleton
+      ├── formatters.js        — Currency, date, score formatters
+      ├── shapLabels.js        — SHAP feature name → human label mapping
+      └── utils.js             — clsx, misc helpers
+
+7.2 API CONTRACT
+
+  The frontend expects ALL API responses in this envelope:
+    { success: boolean, message: string, data: <payload> }
+
+  The axios interceptor (api.js line 14) already unwraps this:
+    response => response.data   ← means callers get the envelope, not payload
+
+  IMPORTANT: After await api.post('/transactions', ...) the result is
+  the full envelope { success, data: { transaction, mlResult, alert } }.
+  Unwrap manually: res.data.transaction (or res.data?.data?.transaction
+  depending on interceptor version).
+
+7.3 STATE MANAGEMENT (Zustand stores)
+
+  dashboardStore.js  — metrics, fraudTrend, channelData, riskHistogram
+    fetch functions: fetchMetrics(), fetchFraudTrend(), fetchChannel()
+    All use api.get() internally and store in Zustand
+
+  alertStore.js      — alerts list, pagination, filters
+    fetchAlerts(page, limit, filters)
+    updateAlertStatus(id, status)
+
+  transactionStore.js — transactions list, pagination
+    fetchTransactions()
+
+  simulationStore.js — simulation run state
+
+  themeStore.js      — theme: "dark" | "light"
+    persisted to localStorage
+
+7.4 ROUTING
+
+  Route "/"           → LandingPage (standalone, no Layout wrapper)
+  Route "/dashboard"  → DashboardPage
+  Route "/analyze"    → AnalyzePage
+  Route "/alerts"     → AlertsPage
+  Route "/transactions" → TransactionsPage
+  Route "/accounts"   → AccountsPage
+  Route "/investigations" → InvestigationsPage
+  Route "/network"    → NetworkPage
+  Route "/model"      → ModelPage
+
+  Layout.jsx wraps all routes except "/" via nested routing.
+
+7.5 CHART COMPONENTS
+
+  FraudTrendChart.jsx
+    Library: Recharts LineChart
+    Data shape: [{ date: "Apr 01", total: 45, fraud: 3 }, ...]
+    Props: none (reads from dashboardStore)
+
+  ChannelDonut.jsx
+    Library: Recharts PieChart
+    IMPORTANT: Use explicit pixel width/height (230×230), NOT "100%"
+    Recharts v3 has a known bug with ResponsiveContainer when initially hidden
+
+  RiskHistogram.jsx
+    Library: Recharts BarChart
+    Data shape: [{ range: "0-10%", count: 120 }, ...]
+
+  TopRiskTable.jsx
+    Library: Plain HTML table with Tailwind
+    Sortable by fraudScore
+
+  LiveTransactionFeed.jsx
+    Uses socket.js singleton
+    Listens to TRANSACTION_SCORED and ALERT_CREATED events
+
+7.6 NETWORK GRAPH (NetworkPage)
+
+  Library: react-force-graph-2d (canvas-based)
+  Data:    GET /api/graph/nodes and GET /api/graph/edges
+  Node schema: { id, accountHolder, bankName, riskScore, muleScore, isFrozen }
+  Edge schema: { source, target, amount, riskScore, type }
+
+  Edge aggregation is done client-side before passing to the graph:
+    - Multiple edges between same source→target are merged into one
+    - Merged edge weight = count of original edges
+    - Line width on canvas = proportional to weight
+
+  Canvas rendering uses forceGraph's nodeCanvasObject and linkCanvasObject
+  callbacks for custom drawing (colored nodes, risk halos, etc.)
+
+7.7 SOCKET.IO CONNECTION
+
+  socket.js exports a singleton:
+    import socket from '../lib/socket';
+    socket.on('TRANSACTION_SCORED', callback);
+    socket.on('ALERT_CREATED', callback);
+
+  Server URL hardcoded to "" (same origin, Vite proxies /socket.io to :5000).
+
+7.8 VITE PROXY CONFIG
+
+  vite.config.js proxies /api → http://localhost:5000 and /socket.io → same.
+  If your backend runs on a different port, update the proxy target.
+
+7.9 AUTH BYPASS FOR DEMO
+
+  Every axios request sends header: "X-Demo-Mode: true"
+  The backend auth middleware skips JWT verification when this header is present.
+  To enable real auth: remove that header from api.js and implement a login flow.
+
+7.10 THEMING
+
+  CSS custom properties in index.css define all colors.
+  Dark/light mode toggled by adding/removing class "dark" on <html>.
+  Tailwind v4 uses CSS-variable-based theming (no tailwind.config.js needed
+  for color tokens — they're defined inline in index.css).
+
+7.11 TO INTEGRATE INTO A DIFFERENT BACKEND
+
+  The minimum you need to implement on your backend:
+
+  1. POST /api/transactions   → returns { success, data: { transaction, mlResult, alert } }
+  2. GET  /api/accounts       → returns { success, data: [...accounts] }
+  3. GET  /api/dashboard/metrics → returns { success, data: { total, fraud, alerts, accounts } }
+  4. GET  /api/dashboard/fraud-trend → returns { success, data: [...{date, total, fraud}] }
+  5. GET  /api/alerts         → returns { success, data: { alerts: [...], total, page } }
+  6. Socket.io server emitting TRANSACTION_SCORED and ALERT_CREATED events
+
+  Optional (pages will show empty state without these):
+  - GET /api/graph/nodes + /api/graph/edges
+  - GET /api/ml/model-info
+  - GET /api/transactions
+  - GET /api/investigations
+
+--------------------------------------------------------------------------------
+8. KNOWN ISSUES / HONEST LIMITATIONS
+--------------------------------------------------------------------------------
+
+1. XGBoost NOT used for live scoring
+   See explanation in Section 4. The model runs fine in FastAPI but its
+   output can't be reliably calibrated for single-transaction real-time use.
+   It is only useful in batch scoring mode (update_db_scores.py).
+
+2. "SHAP" labels are fake
+   The feature contribution values shown as "Risk Signals" are:
+   feature_importance_value × 1 (just the importance weight, not real SHAP).
+   Real SHAP requires the shap library and per-prediction TreeExplainer calls.
+   That is NOT implemented.
+
+3. Recharts warning (cosmetic)
+   The ChannelDonut.jsx chart previously showed "width(-1) height(-1)" warning.
+   Fixed by using explicit 230×230 pixel dimensions instead of "100%".
+   If the chart container is hidden on initial mount, you may still see this.
+
+4. No Kafka
+   The platform uses synchronous in-process scoring. WebSocket events are
+   emitted directly from transactionService.js. No message queue is used.
+
+5. No real account history in ML features
+   The fastAPI service computes rolling features (sender_avg_amount etc.)
+   from the india_extras.pkl which contains PaySim training data accounts.
+   Our seeded accounts (15 accounts) are not in that dataset, so the ML
+   features fall back to neutral hard-coded defaults.
+
+6. Database seeding
+   Historical data is seeded via node seed-history.js (577 transactions).
+   If DB is cleared, the dashboard trend charts will be empty.
+   Reseed with: node clear-data.js && node seed-history.js
+
+7. LLM is slow
+   Ollama qwen3:8b is an 8B parameter model. First response takes 5-15s.
+   Subsequent responses with keep_alive="5m" are 2-5s if model is in VRAM.
+   Gemini 2.5 Flash is faster (~1-2s) but has rate limits on free tier.
+
+8. Auth is demo-only
+   Real JWT auth is implemented but bypassed via X-Demo-Mode header.
+   No session persistence, no refresh tokens.
+
+9. Account risk scores drift
+   Each transaction updates sender and receiver account muleScore / riskScore
+   via rolling weighted average. If you submit many fraud scenarios, accounts
+   will accumulate high mule scores and start flagging legitimate transactions.
+   Reset with: node server/reset-accounts.js
+
+--------------------------------------------------------------------------------
+9. FILE COUNTS
+--------------------------------------------------------------------------------
+
+  Server (Node.js):
+    Routes:      9 files
+    Controllers: 8 files
+    Services:    7 files
+    Middleware:  auth, validate, errorHandler, rateLimiter
+    Utils:       ApiError, ApiResponse, constants, helpers, logger
+
+  Client (React):
+    Pages:       9 files (+ 1 CSS module for ModelPage)
+    Components:  7 dashboard + 3 layout + 18 ui primitives
+    Stores:      5 Zustand stores
+    Lib:         5 files
+
+  Python ML:
+    api/main.py           — FastAPI app with /health, /predict, /explain,
+                            /model-info endpoints
+    models/predictor.py   — Single transaction inference (with Platt calibration)
+    models/trainer.py     — XGBoost training script
+    models/update_db_scores.py — Batch scoring script
+    features/engineering.py   — Feature engineering (single + batch)
+    features/graph_features.py — NetworkX graph computation (precomputed)
+    config.py             — Paths and settings
+    run.py                — Uvicorn entry point
+    kaggle_preprocess.py  — Dataset preprocessing (run once)
+
+--------------------------------------------------------------------------------
+END OF REPORT
+================================================================================

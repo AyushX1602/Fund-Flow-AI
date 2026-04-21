@@ -10,6 +10,7 @@ import InvestigationsPage from "@/pages/InvestigationsPage";
 import ModelPage from "@/pages/ModelPage";
 import AnalyzePage from "@/pages/AnalyzePage";
 import LandingPage from "@/pages/LandingPage";
+import PreScreenPage from "@/pages/PreScreenPage";
 import socket from "@/lib/socket";
 import useTransactionStore from "@/stores/transactionStore";
 import useAlertStore from "@/stores/alertStore";
@@ -86,6 +87,7 @@ export default function App() {
             <Route path="/investigations" element={<InvestigationsPage />} />
             <Route path="/model" element={<ModelPage />} />
             <Route path="/analyze" element={<AnalyzePage />} />
+            <Route path="/prescreen" element={<PreScreenPage />} />
           </Route>
         </Routes>
       </SocketProvider>

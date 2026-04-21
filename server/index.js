@@ -25,7 +25,8 @@ const accountRoutes = require("./routes/accounts");
 const dashboardRoutes = require("./routes/dashboard");
 const mlRoutes = require("./routes/ml");
 const graphRoutes = require("./routes/graph");
-const auditLogRoutes = require("./routes/auditLogs");
+const auditLogRoutes   = require("./routes/auditLogs");
+const preemptiveRoutes = require("./routes/preemptive");
 
 // Import services that need Socket.io injection
 const transactionService = require("./services/transactionService");
@@ -33,6 +34,7 @@ const alertService = require("./services/alertService");
 const simulationService = require("./services/simulationService");
 const accountController = require("./controllers/accountController");
 const graphController = require("./controllers/graphController");
+const preemptiveEngine = require("./services/preemptiveEngine");
 
 // ─────────────────────────────────────────────
 // App Setup
@@ -54,6 +56,7 @@ alertService.setSocketIO(io);
 simulationService.setSocketIO(io);
 accountController.setSocketIO(io);
 graphController.setSocketIO(io);
+preemptiveEngine.setSocketIO(io);
 
 // Initialize Socket.io handlers
 initializeSocket(io);
@@ -110,6 +113,7 @@ app.use("/api/dashboard", dashboardRoutes);
 app.use("/api/ml", mlRoutes);
 app.use("/api/graph", graphRoutes);
 app.use("/api/audit-logs", auditLogRoutes);
+app.use("/api/preemptive", preemptiveRoutes);
 
 // ─────────────────────────────────────────────
 // 404 Handler
@@ -144,11 +148,15 @@ server.listen(config.port, async () => {
   } catch (err) {
     logger.warn("Ollama warmup skipped:", err.message);
   }
+
+  // Start preemptive fraud detection engine
+  preemptiveEngine.start();
 });
 
 // Graceful shutdown
 process.on("SIGTERM", async () => {
   logger.info("SIGTERM received. Shutting down gracefully...");
+  preemptiveEngine.stop();
   await prisma.$disconnect();
   server.close(() => process.exit(0));
 });

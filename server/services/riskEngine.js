@@ -48,13 +48,20 @@ const TIER3_CITIES = new Set([
 const HIGH_RISK_PSPS = new Set(["ibl", "fino", "paytm", "airtel"]);
 
 // ─── Weights for weighted average (must sum to 1.0) ──────────────────────
+// Calibrated against XGBoost feature importances (ML Model page):
+//   Channel signals (UPI/IMPS/NEFT/ATM) dominate at ~55% combined → L2 boosted
+//   Time/velocity signals (Night Hours, Hour of Day) = ~14%       → L6 boosted
+//   Terminal Receiver (network) = ~5% only                        → L5 reduced
+//   Amount deviation (behavioral) = ~4% in model                  → L3 reduced
+//   L4_ml stays highest — it already encodes all features internally
 const LAYER_WEIGHTS = {
-  L1_location:   0.12,
-  L2_channel:    0.10,
-  L3_behavioral: 0.18,
-  L4_ml:         0.35, // ML carries the most weight in avg
-  L5_network:    0.15,
-  L6_velocity:   0.10,
+  L1_location:   0.12, // Cross-bank + city-tier + PSP risk
+  L2_channel:    0.15, // ↑ Channel is #1 ML feature (UPI/IMPS/NEFT/ATM = 55%)
+  L3_behavioral: 0.15, // ↓ Amount deviation less critical per ML (~4%)
+  L4_ml:         0.35, // ML XGBoost score — highest weight, encodes all features
+  L5_network:    0.10, // ↓ Terminal receiver only ~5% importance in XGBoost
+  L6_velocity:   0.13, // ↑ Night hours + hour of day = ~14% in ML
+  // Sum: 0.12 + 0.15 + 0.15 + 0.35 + 0.10 + 0.13 = 1.00
 };
 
 /**

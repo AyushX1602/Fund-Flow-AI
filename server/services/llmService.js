@@ -1,66 +1,78 @@
 /**
- * llmService.js — Dual-Brain LLM Service
+ * llmService.js — Dual LLM Service
  *
- * Supports two LLM providers:
- *   1. Ollama  (local, no rate limits, offline, RTX 4050 6GB friendly)
- *   2. Gemini  (cloud, free tier: ~15 RPM)
+ * Provider priority:
+ *   1. OpenAI ChatGPT  (primary  — gpt-4o-mini, fast, reliable)
+ *   2. Ollama          (fallback — qwen3:8b local, offline)
  *
  * Set LLM_PROVIDER in .env:
- *   LLM_PROVIDER=ollama   → use Ollama only
- *   LLM_PROVIDER=gemini   → use Gemini only
- *   LLM_PROVIDER=auto     → try Ollama first, fall back to Gemini (default)
+ *   LLM_PROVIDER=openai  → ChatGPT only
+ *   LLM_PROVIDER=ollama  → Ollama only
+ *   LLM_PROVIDER=auto    → ChatGPT first, Ollama fallback (default)
  *
- * Ollama setup:
- *   1. Install: https://ollama.com/download/windows
- *   2. Pull model: ollama pull mistral:7b-instruct  (4GB, fits RTX 4050 6GB)
- *      Or lighter: ollama pull llama3.2:3b           (2GB, faster)
+ * Required env vars:
+ *   OPENAI_API_KEY   → your OpenAI key
+ *   OPENAI_MODEL     → default: gpt-4o-mini
+ *   OLLAMA_URL       → default: http://localhost:11434
+ *   OLLAMA_MODEL     → default: qwen3:8b
  */
 
-const { GoogleGenerativeAI } = require("@google/generative-ai");
-const axios = require("axios");
-const logger = require("../utils/logger");
+const { OpenAI } = require("openai");
+const axios      = require("axios");
+const logger     = require("../utils/logger");
 
-// ─── Config ──────────────────────────────────────────────────────────────────
-const UNCERTAIN_MIN   = 0.35;
-const UNCERTAIN_MAX   = 0.75;
-const CACHE_TTL_MS    = 30 * 60 * 1000; // 30 min cache
-const MIN_GAP_MS      = 4000;           // 4s between Gemini calls (15 RPM)
-const GEMINI_TIMEOUT  = 25000;          // 25s for Gemini cloud
-const OLLAMA_TIMEOUT  = 60000;          // 60s max for Ollama (1 min as requested)
-const MAX_DAILY       = 100;            // Gemini daily cap
+// ─── Config ───────────────────────────────────────────────────────────────────
+const UNCERTAIN_MIN    = 0.35;
+const UNCERTAIN_MAX    = 0.75;
+const CACHE_TTL_MS   = 30 * 60 * 1000;  // 30 min cache
+const OPENAI_TIMEOUT = 20000;            // 20s
+const OLLAMA_TIMEOUT = 60000;            // 60s
 
-// Ollama config
-const OLLAMA_URL      = process.env.OLLAMA_URL      || "http://localhost:11434";
-const OLLAMA_MODEL    = process.env.OLLAMA_MODEL    || "qwen3:8b";
-const LLM_PROVIDER    = process.env.LLM_PROVIDER    || "auto"; // ollama | gemini | auto
+// Provider config
+const LLM_PROVIDER = process.env.LLM_PROVIDER || "auto";
+const OPENAI_MODEL = process.env.OPENAI_MODEL || "gpt-4o-mini";
+const OLLAMA_URL   = process.env.OLLAMA_URL   || "http://localhost:11434";
+const OLLAMA_MODEL = process.env.OLLAMA_MODEL || "qwen3:8b";
 
-// Gemini model
-const GEMINI_MODEL    = process.env.GEMINI_MODEL    || "gemini-2.5-flash-preview-04-17";
-
-// ─── State ────────────────────────────────────────────────────────────────────
-let geminiModel   = null;
-let lastCallTime  = 0;
-let dailyCallCount = 0;
+// ─── State ───────────────────────────────────────────────────────────────────
+let openaiClient   = null;
 let ollamaWarmedUp = false;
-
-function getNextMidnight() {
-  const d = new Date();
-  d.setHours(24, 0, 0, 0);
-  return d.getTime();
-}
-let dailyResetAt = getNextMidnight();
 
 const analysisCache = new Map();
 
-// ─── Gemini Init ─────────────────────────────────────────────────────────────
-function getGeminiModel() {
-  if (geminiModel) return geminiModel;
-  const apiKey = process.env.GEMINI_API_KEY;
-  if (!apiKey || apiKey === "your_gemini_api_key_here") return null;
-  const genAI = new GoogleGenerativeAI(apiKey);
-  geminiModel = genAI.getGenerativeModel({ model: GEMINI_MODEL });
-  logger.info(`Gemini LLM initialized (${GEMINI_MODEL})`);
-  return geminiModel;
+// ─── OpenAI Init ─────────────────────────────────────────────────────────────
+function getOpenAIClient() {
+  if (openaiClient) return openaiClient;
+  const apiKey = process.env.OPENAI_API_KEY;
+  if (!apiKey || apiKey.startsWith("sk-your") || apiKey === "") return null;
+  openaiClient = new OpenAI({ apiKey, timeout: OPENAI_TIMEOUT });
+  logger.info(`OpenAI LLM initialized (${OPENAI_MODEL})`);
+  return openaiClient;
+}
+
+// ─── OpenAI Call ──────────────────────────────────────────────────────────────
+async function callOpenAI(prompt) {
+  const client = getOpenAIClient();
+  if (!client) throw new Error("OPENAI_NOT_CONFIGURED");
+
+  const response = await client.chat.completions.create({
+    model: OPENAI_MODEL,
+    messages: [
+      {
+        role: "system",
+        content: "You are an expert fraud analyst at an Indian Public Sector Bank. Respond only in valid JSON.",
+      },
+      {
+        role: "user",
+        content: prompt,
+      },
+    ],
+    temperature: 0.1,
+    max_tokens: 500,
+    response_format: { type: "json_object" },  // forces valid JSON output
+  });
+
+  return response.choices[0]?.message?.content || "";
 }
 
 // ─── Ollama Availability Check ────────────────────────────────────────────────
@@ -68,8 +80,7 @@ async function isOllamaRunning() {
   try {
     const res = await axios.get(`${OLLAMA_URL}/api/tags`, { timeout: 2000 });
     const models = res.data?.models || [];
-    const available = models.some(m => m.name?.startsWith(OLLAMA_MODEL.split(":")[0]));
-    return available;
+    return models.some(m => m.name?.startsWith(OLLAMA_MODEL.split(":")[0]));
   } catch {
     return false;
   }
@@ -77,15 +88,14 @@ async function isOllamaRunning() {
 
 // ─── Ollama Call ──────────────────────────────────────────────────────────────
 async function callOllama(prompt) {
-  // Always use 60s timeout (model stays in VRAM thanks to keep_alive)
   const res = await axios.post(
     `${OLLAMA_URL}/api/generate`,
     {
       model: OLLAMA_MODEL,
       prompt,
       stream: false,
-      keep_alive: "5m", // Keep model in VRAM for 5 min of idle — avoids cold starts
-      options: { temperature: 0.1, num_predict: 1000 },
+      keep_alive: "5m",
+      options: { temperature: 0.1, num_predict: 500 },
     },
     { timeout: OLLAMA_TIMEOUT }
   );
@@ -93,15 +103,15 @@ async function callOllama(prompt) {
   return res.data?.response || "";
 }
 
-// ─── Ollama Warmup (preload model into VRAM on server start) ─────────────────
+// ─── Ollama Warmup ────────────────────────────────────────────────────────────
 async function warmupOllama() {
-  if (LLM_PROVIDER !== "ollama" && LLM_PROVIDER !== "auto") return;
+  if (LLM_PROVIDER === "openai" || LLM_PROVIDER === "gemini") return;
   const running = await isOllamaRunning();
   if (!running) {
     logger.info("Ollama not running — skipping warmup");
     return;
   }
-  logger.info(`Warming up Ollama (${OLLAMA_MODEL}) — loading model into VRAM...`);
+  logger.info(`Warming up Ollama (${OLLAMA_MODEL})...`);
   try {
     const start = Date.now();
     await axios.post(
@@ -110,63 +120,50 @@ async function warmupOllama() {
       { timeout: OLLAMA_TIMEOUT }
     );
     ollamaWarmedUp = true;
-    logger.info(`Ollama warmup complete in ${((Date.now() - start) / 1000).toFixed(1)}s — model loaded into VRAM`);
+    logger.info(`Ollama warmup done in ${((Date.now() - start) / 1000).toFixed(1)}s`);
   } catch (err) {
     logger.warn(`Ollama warmup failed: ${err.message}`);
   }
 }
 
-// ─── Gemini Call ──────────────────────────────────────────────────────────────
-async function callGemini(prompt) {
-  // Rate limit guard
-  if (Date.now() > dailyResetAt) { dailyCallCount = 0; dailyResetAt = getNextMidnight(); }
-  if (dailyCallCount >= MAX_DAILY) throw new Error("QUOTA_EXHAUSTED");
-
-  const now = Date.now();
-  const waitMs = Math.max(0, MIN_GAP_MS - (now - lastCallTime));
-  if (waitMs > 0) await new Promise(r => setTimeout(r, waitMs));
-  lastCallTime = Date.now();
-
-  const model = getGeminiModel();
-  if (!model) throw new Error("GEMINI_NOT_CONFIGURED");
-
-  const result = await Promise.race([
-    model.generateContent(prompt),
-    new Promise((_, reject) => setTimeout(() => reject(new Error("LLM timeout")), GEMINI_TIMEOUT)),
-  ]);
-  dailyCallCount++;
-  return result.response.text();
-}
-
-// ─── Smart Router ─────────────────────────────────────────────────────────────
-async function callLLM(prompt, context = "auto") {
-  const provider = context === "force" ? LLM_PROVIDER : LLM_PROVIDER;
-
-  if (provider === "ollama") {
+// ─── Smart Router — ChatGPT → Ollama ─────────────────────────────────────────
+async function callLLM(prompt) {
+  // Explicit single-provider modes
+  if (LLM_PROVIDER === "openai") {
+    const text = await callOpenAI(prompt);
+    return { text, model: OPENAI_MODEL, provider: "openai" };
+  }
+  if (LLM_PROVIDER === "ollama") {
     const text = await callOllama(prompt);
     return { text, model: OLLAMA_MODEL, provider: "ollama" };
   }
 
-  if (provider === "gemini") {
-    const text = await callGemini(prompt);
-    return { text, model: GEMINI_MODEL, provider: "gemini" };
-  }
-
-  // "auto" — try Ollama first, fall back to Gemini
-  const ollamaUp = await isOllamaRunning();
-  if (ollamaUp) {
+  // "auto" — ChatGPT first, Ollama fallback
+  // 1. Try OpenAI
+  const client = getOpenAIClient();
+  if (client) {
     try {
-      logger.info(`Using Ollama (${OLLAMA_MODEL}) for LLM analysis`);
-      const text = await callOllama(prompt);
-      return { text, model: OLLAMA_MODEL, provider: "ollama" };
+      logger.info(`[LLM] Using OpenAI (${OPENAI_MODEL})`);
+      const text = await callOpenAI(prompt);
+      return { text, model: OPENAI_MODEL, provider: "openai" };
     } catch (err) {
-      logger.warn(`Ollama failed (${err.message}), falling back to Gemini`);
+      logger.warn(`[LLM] OpenAI failed (${err.message}), trying Ollama...`);
     }
   }
 
-  logger.info(`Using Gemini (${GEMINI_MODEL}) for LLM analysis`);
-  const text = await callGemini(prompt);
-  return { text, model: GEMINI_MODEL, provider: "gemini" };
+  // 2. Try Ollama
+  const ollamaUp = await isOllamaRunning();
+  if (ollamaUp) {
+    try {
+      logger.info(`[LLM] Using Ollama (${OLLAMA_MODEL})`);
+      const text = await callOllama(prompt);
+      return { text, model: OLLAMA_MODEL, provider: "ollama" };
+    } catch (err) {
+      logger.warn(`[LLM] Ollama failed: ${err.message}`);
+    }
+  }
+
+  throw new Error("NO_LLM_AVAILABLE");
 }
 
 // ─── Prompt Builder ───────────────────────────────────────────────────────────
@@ -189,7 +186,7 @@ TRANSACTION:
 - Amount: ₹${Number(transaction.amount).toLocaleString("en-IN")}
 - Type: ${transaction.type} via ${transaction.channel}
 - Time: ${new Date(transaction.timestamp).toLocaleString("en-IN", { timeZone: "Asia/Kolkata" })}
-- Remarks: "${transaction.description || '(none)'}"
+- Remarks: "${transaction.description || "(none)"}"
 
 SENDER ACCOUNT:
 - Bank: ${senderAccount.bankName}
@@ -220,8 +217,8 @@ Valid verdicts: SUSPICIOUS, MONITOR, CLEAR`;
 // ─── Response Parser ──────────────────────────────────────────────────────────
 function parseLLMResponse(text, modelName) {
   try {
-    // Qwen3 wraps reasoning in <think>...</think> tags — strip them
-    let cleaned = text.replace(/<think>[\s\S]*?<\/think>/g, '').trim();
+    // Strip Qwen3 <think>...</think> tags if present (Ollama)
+    let cleaned = text.replace(/<think>[\s\S]*?<\/think>/g, "").trim();
     const jsonMatch = cleaned.match(/\{[\s\S]*\}/);
     if (!jsonMatch) throw new Error("No JSON in response");
     const parsed = JSON.parse(jsonMatch[0]);
@@ -235,12 +232,12 @@ function parseLLMResponse(text, modelName) {
     };
   } catch {
     return {
-      verdict:   "MONITOR",
-      confidence: 0.5,
-      reasoning:  text.slice(0, 300),
-      flags:      [],
-      fromCache:  false,
-      model:      modelName,
+      verdict:    "MONITOR",
+      confidence:  0.5,
+      reasoning:   text.slice(0, 300),
+      flags:       [],
+      fromCache:   false,
+      model:       modelName,
     };
   }
 }
@@ -292,38 +289,28 @@ async function forceAnalyse(transaction, senderAccount, mlResult, riskProfile) {
   const prompt = buildPrompt(transaction, senderAccount, mlResult, riskProfile, effectiveScore);
 
   try {
-    logger.info(`Forced LLM analysis for txn ${transaction.transactionId} (provider: ${LLM_PROVIDER})`);
-    const { text, model, provider } = await callLLM(prompt, "force");
+    logger.info(`[LLM] Force analysis for ${transaction.transactionId} (provider: ${LLM_PROVIDER})`);
+    const { text, model, provider } = await callLLM(prompt);
     const result = parseLLMResponse(text, model);
-    logger.info(`LLM result: ${result.verdict} (${provider})`);
+    logger.info(`[LLM] Verdict: ${result.verdict} via ${provider}`);
     analysisCache.set(cacheKey, { result, expiresAt: Date.now() + CACHE_TTL_MS });
     return result;
   } catch (err) {
     const msg = err.message || "Unknown error";
     logger.error("LLM forceAnalyse error", { error: msg });
 
-    if (msg === "QUOTA_EXHAUSTED") {
-      return errorResult("QUOTA_EXHAUSTED", `Daily AI quota (${MAX_DAILY} calls) exhausted. Resets at midnight.`, GEMINI_MODEL);
-    }
-    if (msg === "LLM timeout") {
-      return errorResult("TIMEOUT", "AI service timed out. Try again in a moment.", LLM_PROVIDER);
-    }
-    if (msg.includes("429") || msg.includes("quota") || msg.includes("RATE_LIMITED")) {
-      return errorResult("RATE_LIMITED", "Rate limit reached. Wait ~60 seconds and retry.", GEMINI_MODEL);
-    }
-    if (msg === "GEMINI_NOT_CONFIGURED") {
-      return errorResult("UNAVAILABLE", "No LLM configured. Install Ollama or add GEMINI_API_KEY to .env.", "none");
-    }
+    if (msg === "LLM timeout")           return errorResult("TIMEOUT", "AI service timed out. Retry shortly.", LLM_PROVIDER);
+    if (msg === "OPENAI_NOT_CONFIGURED") return errorResult("UNAVAILABLE", "OpenAI API key not set in .env.", "openai");
+    if (msg === "NO_LLM_AVAILABLE")      return errorResult("UNAVAILABLE", "No LLM available. Set OPENAI_API_KEY or start Ollama.", "none");
+    if (msg.includes("429") || msg.includes("quota")) return errorResult("RATE_LIMITED", "Rate limit hit. Wait 60s and retry.", LLM_PROVIDER);
     return errorResult("ERROR", msg, LLM_PROVIDER);
   }
 }
 
-// ─── Utilities ────────────────────────────────────────────────────────────────
+// ─── Utilities ───────────────────────────────────────────────────────────────
 function isLLMAvailable() {
-  const geminiKey = process.env.GEMINI_API_KEY;
-  const hasGemini = !!(geminiKey && geminiKey !== "your_gemini_api_key_here");
-  // Ollama availability is checked at runtime — assume available if provider is set to ollama
-  return hasGemini || LLM_PROVIDER === "ollama" || LLM_PROVIDER === "auto";
+  const hasOpenAI = !!(process.env.OPENAI_API_KEY && !process.env.OPENAI_API_KEY.startsWith("sk-your"));
+  return hasOpenAI || LLM_PROVIDER === "ollama" || LLM_PROVIDER === "auto";
 }
 
 function clearCache() {

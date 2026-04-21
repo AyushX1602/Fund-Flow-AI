@@ -8,6 +8,7 @@ import LiveTransactionFeed from "@/components/dashboard/LiveTransactionFeed";
 import RecentAlerts from "@/components/dashboard/RecentAlerts";
 import ChannelDonut from "@/components/dashboard/ChannelDonut";
 import TopRiskTable from "@/components/dashboard/TopRiskTable";
+import PreemptiveWatchCard from "@/components/dashboard/PreemptiveWatchCard";
 import useDashboardStore from "@/stores/dashboardStore";
 
 export default function DashboardPage() {
@@ -30,6 +31,9 @@ export default function DashboardPage() {
         className="flex-1 space-y-5 p-6"
       >
         <MetricCards />
+
+        {/* Preemptive Watch — proactive account monitoring */}
+        <PreemptiveWatchCard />
 
         <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
           <FraudTrendChart />

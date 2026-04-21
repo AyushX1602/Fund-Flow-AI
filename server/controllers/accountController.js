@@ -306,4 +306,72 @@ async function getRiskProfile(req, res, next) {
   }
 }
 
-module.exports = { list, getById, create, update, freezeAccount, unfreezeAccount, getTransactions, getRiskProfile, setSocketIO };
+/**
+ * GET /api/accounts/:id/freeze-simulate
+ * Simulate the impact of freezing an account.
+ */
+async function freezeSimulate(req, res, next) {
+  try {
+    const accountId = req.params.id;
+    const account = await prisma.account.findUnique({ where: { id: accountId } });
+    if (!account) throw ApiError.notFound("Account not found");
+
+    const since7d = new Date(Date.now() - 7 * 24 * 3600 * 1000);
+
+    const outgoing = await prisma.transaction.findMany({
+      where:   { senderAccountId: accountId, timestamp: { gte: since7d } },
+      select:  { id: true, amount: true, receiverAccountId: true, timestamp: true },
+      orderBy: { timestamp: "desc" },
+    });
+
+    const moneySaved = outgoing.reduce((sum, t) => sum + t.amount, 0);
+
+    // BFS forward (max 3 hops)
+    const reachable = new Set();
+    const visited   = new Set([accountId]);
+    let   frontier  = outgoing.map(t => t.receiverAccountId).filter(id => !visited.has(id));
+    frontier.forEach(id => visited.add(id));
+    frontier.forEach(id => reachable.add(id));
+
+    for (let hop = 0; hop < 2 && frontier.length > 0; hop++) {
+      const nextLayer = await prisma.transaction.findMany({
+        where:  { senderAccountId: { in: frontier }, timestamp: { gte: since7d } },
+        select: { receiverAccountId: true },
+      });
+      frontier = [];
+      for (const { receiverAccountId } of nextLayer) {
+        if (!visited.has(receiverAccountId)) {
+          visited.add(receiverAccountId);
+          reachable.add(receiverAccountId);
+          frontier.push(receiverAccountId);
+        }
+      }
+    }
+
+    const disruptedAccounts = reachable.size > 0
+      ? await prisma.account.findMany({
+          where:  { id: { in: Array.from(reachable) } },
+          select: { id: true, accountNumber: true, accountHolder: true, bankName: true, muleScore: true, riskScore: true },
+        })
+      : [];
+
+    const suspicious = disruptedAccounts.filter(a => a.muleScore > 0.4 || a.riskScore > 0.5);
+    const collateral = disruptedAccounts.filter(a => a.muleScore <= 0.4 && a.riskScore <= 0.5);
+
+    ApiResponse.success({
+      frozenAccount:      { id: account.id, accountNumber: account.accountNumber, accountHolder: account.accountHolder },
+      moneySaved:         parseFloat(moneySaved.toFixed(2)),
+      outgoingCount:      outgoing.length,
+      disruptedTotal:     reachable.size,
+      suspiciousCount:    suspicious.length,
+      collateralCount:    collateral.length,
+      suspiciousAccounts: suspicious.slice(0, 20),
+      collateralAccounts: collateral.slice(0, 10),
+      summary: `Freezing ${account.accountNumber} stops ₹${moneySaved.toLocaleString("en-IN")} across ${outgoing.length} outgoing txns. ${reachable.size} downstream accounts disrupted (${suspicious.length} suspicious, ${collateral.length} legitimate).`,
+    }, "Freeze simulation complete").send(res);
+  } catch (error) {
+    next(error);
+  }
+}
+
+module.exports = { list, getById, create, update, freezeAccount, unfreezeAccount, getTransactions, getRiskProfile, freezeSimulate, setSocketIO };

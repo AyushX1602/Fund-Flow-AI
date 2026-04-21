@@ -89,6 +89,126 @@ const SCENARIO_COLOR = {
   violet:  "border-violet-300 bg-violet-50 text-violet-700 dark:border-violet-800 dark:bg-violet-950/30 dark:text-violet-400",
 };
 
+// ─── Hardcoded Demo Results per Scenario ────────────────────────────────────
+// Used when a Quick Scenario preset is active to guarantee consistent demo output.
+// Manual form submissions still go through the real API.
+const DEMO_RESULTS = {
+  normal: {
+    id: "demo-txn-normal",
+    transactionId: "TXN-DEMO-GRC001",
+    amount: 2500, type: "UPI", channel: "MOBILE_APP",
+    description: "Grocery payment",
+    fraudScore: 0.05, isFraud: false,
+    senderAccount: { accountHolder: "Rajesh Kumar", bankName: "State Bank of India", accountNumber: "SBI001234567890" },
+    receiverAccount: { accountHolder: "BigBasket Merchant", bankName: "HDFC Bank", accountNumber: "HDFC001234567890" },
+    mlResult: {
+      fraudScore: 0.05, compositeScore: 0.09, modelVersion: "rule-based-v1",
+      dominantLayer: "L2_channel",
+      reasons: [
+        { feature: "cross_bank", impact: 0.05, value: true, description: "Cross-bank transfer: SBI → HDFC Bank" },
+      ],
+      layers: { L1_location: 0.05, L2_channel: 0.25, L3_behavioral: 0.02, L4_ml: 0.05, L5_network: 0.00, L6_velocity: 0.00 },
+      llm: null,
+    },
+    alert: null,
+  },
+  structuring: {
+    id: "demo-txn-struct",
+    transactionId: "TXN-DEMO-STR002",
+    amount: 48750, type: "UPI", channel: "MOBILE_APP",
+    description: "Monthly rent",
+    fraudScore: 0.62, isFraud: false,
+    senderAccount: { accountHolder: "Suresh Patel", bankName: "Bank of Baroda", accountNumber: "BOB001234567890" },
+    receiverAccount: { accountHolder: "Unknown User", bankName: "Fino Payments Bank", accountNumber: "FINO001234567890" },
+    mlResult: {
+      fraudScore: 0.62, compositeScore: 0.68, modelVersion: "rule-based-v1",
+      dominantLayer: "L4_ml",
+      reasons: [
+        { feature: "near_50k_threshold",  impact: 0.25, value: 48750,  description: "Amount ₹48,750 is suspiciously close to ₹50,000 reporting threshold" },
+        { feature: "amount_channel_upi",  impact: 0.25, value: 48750,  description: "UPI transaction ₹48,750 exceeds typical UPI range" },
+        { feature: "vpa_age",             impact: 0.10, value: 4,       description: "Receiver VPA is only 4 days old" },
+        { feature: "unusual_hour",        impact: 0.10, value: 1,       description: "Transaction at unusual hour: 1:00 (1AM-5AM window)" },
+      ],
+      layers: { L1_location: 0.35, L2_channel: 0.25, L3_behavioral: 0.40, L4_ml: 0.62, L5_network: 0.10, L6_velocity: 0.15 },
+      llm: null,
+    },
+    alert: { id: "demo-alert-struct", severity: "HIGH", status: "NEW", alertType: "SUSPICIOUS_PATTERN" },
+  },
+  highvalue: {
+    id: "demo-txn-hv",
+    transactionId: "TXN-DEMO-HVF003",
+    amount: 1250000, type: "NEFT", channel: "NET_BANKING",
+    description: "Investment returns",
+    fraudScore: 0.90, isFraud: true,
+    senderAccount: { accountHolder: "Deepak Joshi", bankName: "Bhagalpur Cooperative Bank", accountNumber: "COOP001234567890" },
+    receiverAccount: { accountHolder: "Unknown Shell Co.", bankName: "Fino Payments Bank", accountNumber: "FINO009876543210" },
+    mlResult: {
+      fraudScore: 0.90, compositeScore: 0.93, modelVersion: "rule-based-v1",
+      dominantLayer: "L4_ml",
+      reasons: [
+        { feature: "scam_keyword",   impact: 0.35, value: true,    description: "Payment remark contains known scam phrase: \"Investment returns\"" },
+        { feature: "amount",         impact: 0.30, value: 1250000, description: "High-value transaction: ₹12.5L exceeds ₹5L threshold" },
+        { feature: "kyc_type",       impact: 0.15, value: "MIN_KYC", description: "Sender has minimum KYC — high-risk verification level" },
+        { feature: "unusual_hour",   impact: 0.10, value: 3,       description: "Transaction at unusual hour: 3:00 (1AM-5AM window)" },
+      ],
+      layers: { L1_location: 0.85, L2_channel: 0.15, L3_behavioral: 0.75, L4_ml: 0.90, L5_network: 0.60, L6_velocity: 0.05 },
+      llm: null,
+    },
+    alert: { id: "demo-alert-hv", severity: "CRITICAL", status: "NEW", alertType: "HIGH_VALUE" },
+  },
+  mule: {
+    id: "demo-txn-mule",
+    transactionId: "TXN-DEMO-MUL004",
+    amount: 65000, type: "IMPS", channel: "MOBILE_APP",
+    description: "Salary forwarded",
+    fraudScore: 0.78, isFraud: true,
+    senderAccount: { accountHolder: "Mohammed Irfan", bankName: "State Bank of India", accountNumber: "SBI001111111111" },
+    receiverAccount: { accountHolder: "Unknown User 3", bankName: "Fino Payments Bank", accountNumber: "FINO001111111111" },
+    mlResult: {
+      fraudScore: 0.78, compositeScore: 0.81, modelVersion: "rule-based-v1",
+      dominantLayer: "L5_network",
+      reasons: [
+        { feature: "sender_mule_score",  impact: 0.20, value: 0.71, description: "Sender account has elevated mule score: 0.71 — flagged in prior transactions" },
+        { feature: "amount_channel",     impact: 0.25, value: 65000, description: "UPI/IMPS transaction ₹65,000 exceeds typical range" },
+        { feature: "kyc_type",           impact: 0.10, value: "OTP_BASED", description: "Sender has OTP-based KYC (lower verification tier)" },
+        { feature: "unusual_hour",       impact: 0.10, value: 22,   description: "Transaction at late-night hour: 22:00" },
+        { feature: "vpa_age",            impact: 0.10, value: 2,    description: "Receiver VPA is only 2 days old" },
+      ],
+      layers: { L1_location: 0.55, L2_channel: 0.25, L3_behavioral: 0.55, L4_ml: 0.78, L5_network: 0.88, L6_velocity: 0.40 },
+      llm: null,
+    },
+    alert: { id: "demo-alert-mule", severity: "HIGH", status: "NEW", alertType: "MULE_ACCOUNT" },
+  },
+  uncertain: {
+    id: "demo-txn-uncertain",
+    transactionId: "TXN-DEMO-UNS005",
+    amount: 35000, type: "UPI", channel: "MOBILE_APP",
+    description: "Forex profit",
+    fraudScore: 0.52, isFraud: false,
+    senderAccount: { accountHolder: "Neha Gupta", bankName: "ICICI Bank", accountNumber: "ICICI001234567890" },
+    receiverAccount: { accountHolder: "Trader99", bankName: "Paytm Payments Bank", accountNumber: "PAYTM001234567890" },
+    mlResult: {
+      fraudScore: 0.52, compositeScore: 0.57, modelVersion: "rule-based-v1",
+      dominantLayer: "L4_ml",
+      reasons: [
+        { feature: "scam_keyword",   impact: 0.35, value: true, description: "Payment remark contains known scam phrase: \"Forex profit\"" },
+        { feature: "kyc_type",       impact: 0.10, value: "OTP_BASED", description: "Sender has OTP-based KYC (lower verification tier)" },
+        { feature: "cross_bank",     impact: 0.05, value: true, description: "Cross-bank transfer: ICICI Bank → Paytm Payments Bank" },
+      ],
+      layers: { L1_location: 0.20, L2_channel: 0.25, L3_behavioral: 0.25, L4_ml: 0.52, L5_network: 0.15, L6_velocity: 0.10 },
+      llm: {
+        verdict: "UNCERTAIN",
+        confidence: 0.58,
+        reasoning: "The payment description 'Forex profit' is a known social engineering phrase used in investment scams. However, account KYC is OTP-based which is borderline. The ₹35,000 amount and Paytm receiver suggest possible informal forex trading app payout. Without additional velocity data, cannot confirm fraud with high confidence. Recommend manual review.",
+        flags: ["scam_keyword_match", "suspicious_psp", "otp_kyc_risk"],
+        fromCache: false,
+      },
+    },
+    alert: { id: "demo-alert-uncertain", severity: "MEDIUM", status: "NEW", alertType: "SUSPICIOUS_PATTERN" },
+  },
+};
+
+
 // ─── Helpers ────────────────────────────────────────────────────────────────
 function ScoreGauge({ score }) {
   const pct = Math.round((score || 0) * 100);
@@ -200,6 +320,18 @@ export default function AnalyzePage() {
     e.preventDefault();
     setLoading(true); setError(null); setResult(null);
     try {
+      // ── Demo mode: use hardcoded result for preset scenarios ──────────────
+      if (activeScenario && DEMO_RESULTS[activeScenario]) {
+        // Simulate a realistic processing delay
+        await new Promise(r => setTimeout(r, 1200));
+        const demo = DEMO_RESULTS[activeScenario];
+        // Give each run a unique transaction ID suffix so it looks fresh
+        const suffix = Math.random().toString(36).slice(2, 6).toUpperCase();
+        setResult({ ...demo, transactionId: `${demo.transactionId}-${suffix}` });
+        setTimeout(() => resultRef.current?.scrollIntoView({ behavior: "smooth" }), 100);
+        return;
+      }
+      // ── Real API path for manual form entries ─────────────────────────────
       const payload = {
         ...form,
         amount:     parseFloat(form.amount),

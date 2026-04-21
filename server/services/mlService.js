@@ -399,9 +399,42 @@ async function getModelInfo() {
   };
 }
 
+
+// ── Named Anomaly Score Functions (used by preemptive engine + UI) ─────────────
+
+/**
+ * Velocity anomaly score (0.0–1.0).
+ * High 1h transaction count relative to 24h baseline = suspicious.
+ */
+function velocityAnomalyScore(txn1h, txn24h) {
+  let score = 0;
+  if (txn1h >= 10)       score += 0.6;
+  else if (txn1h >= 5)   score += 0.3;
+  else if (txn1h >= 3)   score += 0.1;
+  if (txn24h >= 50)      score += 0.4;
+  else if (txn24h >= 20) score += 0.2;
+  return Math.min(score, 1.0);
+}
+
+/**
+ * Amount z-score anomaly (0.0–1.0).
+ * How far the current amount deviates from the account's historical average.
+ */
+function amountAnomalyScore(amount, avg, std) {
+  if (!std || std <= 0 || !avg || avg <= 0) return 0;
+  const z = Math.abs(amount - avg) / std;
+  if (z > 5) return 1.0;
+  if (z > 3) return 0.7;
+  if (z > 2) return 0.4;
+  if (z > 1) return 0.2;
+  return 0;
+}
+
 module.exports = {
   scoreTransaction,
   getExplanation,
   getModelInfo,
   isFastApiAvailable,
+  velocityAnomalyScore,
+  amountAnomalyScore,
 };
